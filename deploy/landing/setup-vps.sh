@@ -84,7 +84,8 @@ else
 fi
 
 # ---------- 5. Nilai buat GitHub Secrets ----------
-PORT="$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}')"
+# awk baca sampai habis (tanpa exit): kalau berhenti duluan, sshd kena SIGPIPE dan pipefail bikin script mati diam-diam
+PORT="$(sshd -T 2>/dev/null | awk '/^port /{p=$2} END{print p}' || true)"
 PORT="${PORT:-22}"
 HOST="${VPS_HOST:-$(hostname -I | awk '{print $1}')}"
 HOST_ENTRY="$HOST"
