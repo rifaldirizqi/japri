@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +20,7 @@ import (
 const (
 	createNoWindow = 0x08000000
 	statusPrefix   = "@@japri-status "
+	infoPrefix     = "@@japri-info "
 	maxLogSize     = 2 << 20 // 2 MB, sisanya pindah ke japri.log.1
 
 	crashLimit  = 3               // gagal 3× ...
@@ -67,11 +69,12 @@ func (s *supervisor) killNow() {
 	_ = cmd.Run()
 }
 
-func (s *supervisor) run(setup string) {
-	// Kenalin tray sekali aja (termasuk yang baru update dari versi yang masih pakai jendela)
-	welcomeMark := filepath.Join(s.p.data, "tray-welcome")
-	_, err := os.Stat(welcomeMark)
-	welcome := err != nil
+// run: setup kalau perlu, terus jalanin bot dan jaga dia tetap nyala.
+// showWindow = buka jendela Japri pas mulai (false kalau autostart waktu Windows nyala).
+func (s *supervisor) run(setup string, showWindow bool) {
+	if !showWindow {
+		s.firstTrayHint()
+	}
 	var failures []time.Time
 	for {
 		if setup != "" {
@@ -83,6 +86,7 @@ func (s *supervisor) run(setup string) {
 				return
 			}
 			setup = ""
+			showWindow = true
 			select {
 			case c := <-s.cmds:
 				if c == menuQuit {
@@ -93,12 +97,11 @@ func (s *supervisor) run(setup string) {
 			}
 		}
 
-		if welcome {
-			welcome = false
-			_ = os.WriteFile(welcomeMark, nil, 0o600)
-			s.t.notify(balloon{title: "Japri jalan di sini", text: "Japri sekarang jalan tanpa jendela, cuma ikon ini. Klik ikonnya buat lihat status dan menu."})
-		}
 		s.t.setState(stConnecting, nil)
+		if showWindow {
+			showWindow = false
+			s.t.showMain()
+		}
 		done, err := s.startBot()
 		var c int
 		if err != nil {
@@ -119,7 +122,7 @@ func (s *supervisor) run(setup string) {
 				if len(failures) >= crashLimit {
 					s.t.setState(stFailed, &balloon{
 						title:   "Japri berhenti",
-						text:    "Japri error terus, udah dicoba nyala ulang 3×. Klik ikon Japri → Lihat log buat detailnya.",
+						text:    "Japri error terus, udah dicoba nyala ulang 3×. Klik ikon Japri buat lihat log-nya.",
 						warning: true,
 					})
 					c = <-s.cmds
@@ -173,7 +176,18 @@ func writeLogLine(w io.Writer, line string) {
 	fmt.Fprintf(w, "%s  %s\r\n", time.Now().Format("2006-01-02 15:04:05"), line)
 }
 
+// firstTrayHint: pertama kali Japri langsung ke tray (autostart), kasih tau dia ada di mana.
+func (s *supervisor) firstTrayHint() {
+	mark := filepath.Join(s.p.data, "tray-hint")
+	if _, err := os.Stat(mark); err == nil {
+		return
+	}
+	_ = os.WriteFile(mark, nil, 0o600)
+	s.t.notify(balloon{title: "Japri jalan di sini", text: "Japri jalan di system tray. Klik ikonnya buat buka jendela Japri."})
+}
+
 func (s *supervisor) logLine(line string) {
+	s.t.appendLog(line)
 	if f, err := s.openLog(); err == nil {
 		writeLogLine(f, line)
 		f.Close()
@@ -198,6 +212,7 @@ func (s *supervisor) startBot() (<-chan int, error) {
 	cmd.Env = append(os.Environ(), "DATA_DIR="+s.p.data, "JAPRI_DESKTOP=1", "JAPRI_TRAY=1", "NO_COLOR=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
 	writeLogLine(logf, "──────── Japri dinyalain ────────")
+	s.t.appendLog("──────── Japri dinyalain ────────")
 	if err := cmd.Start(); err != nil {
 		r.Close()
 		w.Close()
@@ -217,7 +232,15 @@ func (s *supervisor) startBot() (<-chan int, error) {
 				s.onStatus(strings.TrimSpace(line[len(statusPrefix):]))
 				continue
 			}
+			if strings.HasPrefix(line, infoPrefix) {
+				var i struct{ Bot, AI string }
+				if json.Unmarshal([]byte(line[len(infoPrefix):]), &i) == nil {
+					s.t.setInfo(botInfo{bot: i.Bot, ai: i.AI})
+				}
+				continue
+			}
 			writeLogLine(logf, line)
+			s.t.appendLog(line)
 		}
 		_, _ = io.Copy(io.Discard, r) // baris kepanjangan: buang sisanya biar node gak macet
 		_ = cmd.Wait()

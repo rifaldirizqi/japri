@@ -2,6 +2,7 @@ import { z } from "zod";
 import { loadConfig, updateConfig } from "../config.js";
 import * as store from "../db.js";
 import { defineTool, testToolCalling } from "../llm/index.js";
+import { reportInfo } from "../desktop.js";
 import { catchupPrompt, collectCatchup, commitCatchup, transcript } from "../catchup.js";
 import { formatMinutes, formatTs, isValidTimezone, lastOccurrence, nowTs, parseHM } from "../time.js";
 import { checkForUpdate, currentVersion, updateMessage } from "../updater.js";
@@ -211,6 +212,7 @@ export function buildTools(current?: store.Chat) {
           const test = await testToolCalling(candidate);
           if (!test.ok) return `Model "${input.model}" gak bisa dipakai: ${test.detail}. Pengaturan lain ${changes.length ? "tetap disimpan" : "gak berubah"}.`;
           updateConfig({ llm: candidate });
+          reportInfo({ ai: `${candidate.provider} / ${candidate.model}` });
           changes.push(`model (sekarang ${input.model})`);
         }
         return changes.length ? `Disimpan: ${changes.join(", ")}.` : "Gak ada yang diubah.";

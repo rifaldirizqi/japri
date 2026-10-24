@@ -43,7 +43,7 @@ WelcomeLabel2=Japri adalah asisten pribadi buat grup WhatsApp: ngabarin lo kalau
 SelectTasksLabel2=Pilih opsi tambahan, terus klik Next.
 ReadyLabel1=Japri siap di-install.
 FinishedHeadingLabel=Japri udah ter-install
-FinishedLabel=Klik Finish buat mulai Japri. Kalau ini pertama kali, ikuti langkah setup di jendela yang muncul. Setelah itu Japri jalan di system tray (ikon di pojok kanan bawah, deket jam).
+FinishedLabel=Klik Finish buat mulai Japri. Kalau ini pertama kali, ikuti langkah setup di jendela yang muncul.%n%nJendela Japri boleh ditutup kapan aja: Japri tetap jalan di system tray (ikon di pojok kanan bawah, deket jam).
 ClickNext=Klik Next buat lanjut, atau Cancel buat batal.
 ButtonNext=&Next >
 ButtonInstall=&Install
@@ -68,7 +68,7 @@ Name: "{autoprograms}\Japri"; Filename: "{app}\Japri.exe"; IconFilename: "{app}\
 Name: "{autoprograms}\Japri - Ganti pengaturan AI"; Filename: "{app}\Japri.exe"; Parameters: "setup"; IconFilename: "{app}\japri.ico"
 Name: "{autoprograms}\Japri - Buka folder data"; Filename: "{win}\explorer.exe"; Parameters: """{localappdata}\Japri\data"""
 Name: "{autodesktop}\Japri"; Filename: "{app}\Japri.exe"; IconFilename: "{app}\japri.ico"; Tasks: desktopicon
-Name: "{userstartup}\Japri"; Filename: "{app}\Japri.exe"; IconFilename: "{app}\japri.ico"; Tasks: autostart
+Name: "{userstartup}\Japri"; Filename: "{app}\Japri.exe"; IconFilename: "{app}\japri.ico"; Parameters: "--tray"; Tasks: autostart
 
 [Run]
 Filename: "{app}\Japri.exe"; Description: "Jalankan Japri sekarang"; Flags: postinstall nowait skipifsilent

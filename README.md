@@ -39,17 +39,21 @@ Cuma lo yang bisa merintah bot. Orang lain yang nge-DM atau nge-tag bot dicuekin
    - Pilih provider AI, tempel API key (tekan Ctrl+V buat paste), pilih model.
    - Browser kebuka nampilin **QR**. Scan pakai **HP nomor bot**: WhatsApp → Perangkat tertaut → Tautkan perangkat.
    - Muncul **kode setup** 6 digit. Kirim kode itu dari **WhatsApp pribadi lo** ke nomor bot.
-5. Beres. Jendela setup ketutup sendiri, terus Japri jalan di **system tray**: ikon Japri di pojok kanan bawah, deket jam (kalau gak kelihatan, klik panah **^** di situ). Gak ada jendela yang bisa ketutup gak sengaja. Kalau tadi opsi _"Jalankan otomatis"_ dicentang, Japri nyala sendiri tiap Windows nyala.
+5. Beres. Jendela setup ketutup sendiri, terus **jendela Japri** kebuka: isinya status, nomor bot, model AI, tombol-tombol, dan log.
 
-**Ikon tray Japri:**
+**Jendela Japri boleh ditutup kapan aja.** Tombol X atau minimize cuma nyembunyiin jendelanya ke **system tray** (ikon Japri di pojok kanan bawah, deket jam; kalau gak kelihatan, klik panah **^** di situ). Bot-nya tetap jalan. Buat buka lagi, klik ikon itu atau buka Japri dari Desktop / Start Menu. Japri cuma berhenti kalau lo klik **Keluar**.
+
+Kalau tadi opsi _"Jalankan otomatis"_ dicentang, Japri nyala sendiri tiap Windows nyala, langsung ke tray tanpa buka jendela.
+
+**Status Japri** (di jendela dan ikon tray):
 
 | Ikon | Artinya |
 |---|---|
 | Hijau | Jalan normal |
 | Abu-abu | Lagi nyambung ke WhatsApp |
-| Ada tanda **!** merah | Butuh perhatian: perlu scan QR ulang, atau error terus. Muncul juga notifikasi Windows. |
+| Ada tanda **!** merah | Butuh perhatian: perlu scan QR ulang, atau error terus. Muncul juga notifikasi Windows, dan tombol buat beresinnya di jendela Japri. |
 
-Klik ikonnya buat buka menu: **Lihat log**, **Ganti pengaturan AI**, **Buka folder data**, dan **Keluar**. Kalau bot-nya crash, Japri nyalain ulang sendiri.
+Kalau bot-nya crash, Japri nyalain ulang sendiri. Klik kanan ikon tray buat menu cepat: **Buka Japri**, **Ganti pengaturan AI**, **Buka folder data**, **Keluar**.
 
 ### Cara B — Docker
 
@@ -135,12 +139,12 @@ Mau ganti model? Bilang aja ke bot: _"ganti model ke claude-sonnet-5-5"_. Kalau 
 
 | Mau ngapain | Windows (installer) | Docker | Node |
 |---|---|---|---|
-| Lihat log | klik ikon Japri di tray → **Lihat log** | `docker compose logs -f` | lihat terminal / `pm2 logs` |
-| Ganti provider / API key | klik ikon Japri di tray → **Ganti pengaturan AI** | `docker compose run --rm japri setup` → `docker compose up -d` | `npm run setup` |
+| Lihat log | buka jendela Japri (log ada di bawah). Log lengkap: file `japri.log` di folder data | `docker compose logs -f` | lihat terminal / `pm2 logs` |
+| Ganti provider / API key | jendela Japri → **Ganti pengaturan AI** | `docker compose run --rm japri setup` → `docker compose up -d` | `npm run setup` |
 | Update ke versi baru | download & jalanin installer versi baru (data tetap aman) | `git pull && docker compose up -d --build` | `git pull && npm install`, terus restart |
 | Matiin kabar update | bilang ke bot: _"matiin cek update"_ | sama | sama |
-| Berhentiin bot | klik ikon Japri di tray → **Keluar** | `docker compose down` | Ctrl+C / `pm2 stop japri` |
-| Backup | klik ikon Japri di tray → **Buka folder data**, copy isinya | copy folder `data/` | copy folder `data/` |
+| Berhentiin bot | jendela Japri → **Keluar** (nutup jendela doang gak matiin bot) | `docker compose down` | Ctrl+C / `pm2 stop japri` |
+| Backup | jendela Japri → **Buka folder data**, copy isinya | copy folder `data/` | copy folder `data/` |
 | Uninstall | lihat [Uninstall](#uninstall) | `docker compose down`, hapus folder | hapus folder |
 
 Docker/Node: kalau setup di-rerun pas bot lagi nyala, matiin dulu botnya, biar gak ada dua bot di satu nomor. Versi Windows ngurus ini sendiri: Japri dimatiin dulu selama setup, terus dinyalain lagi.
@@ -170,8 +174,8 @@ Shortcut di Desktop, Start Menu, dan autostart ikut kehapus otomatis.
 - **Bot gak bales**: pastiin lo ngirim dari nomor yang dulu ngirim kode setup. Cek log buat lihat error dari provider AI (API key salah, saldo habis, dll).
 - **Ollama dari Docker gak nyambung**: pakai alamat `http://host.docker.internal:11434/v1` (default wizard udah gitu). Pastiin Ollama dengerin di semua alamat: `OLLAMA_HOST=0.0.0.0`.
 - **Reminder telat**: kalau komputer sempat mati, reminder yang kelewat tetap dikirim pas nyala lagi, dan ditandai telat.
-- **Windows: ikon Japri gak kelihatan**: klik panah **^** di pojok kanan bawah. Biar selalu kelihatan, geser ikon Japri ke taskbar. Kalau gak ada juga, berarti Japri gak jalan: buka dari Start Menu.
-- **Windows: ikon ada tanda ! merah**: arahin mouse ke ikonnya buat lihat masalahnya. Kalau _"Berhenti karena error"_, klik ikon → **Lihat log** buat detailnya, terus **Coba jalanin lagi**.
+- **Windows: jendela Japri ilang**: Japri-nya masih jalan di tray. Buka lagi dari ikon Japri di Desktop / Start Menu, atau klik ikon di pojok kanan bawah (klik panah **^** kalau gak kelihatan).
+- **Windows: status merah "Berhenti karena error"**: cek log di jendela Japri buat lihat masalahnya (mis. API key salah), terus klik **Coba jalanin lagi**.
 - **Windows: QR gak kebuka di browser**: buka manual file `qr.html` di folder data (Start Menu → Japri - Buka folder data).
 - **Windows: PC sleep**: bot gak jalan selama PC sleep. Atur di Settings → System → Power → Sleep: _Never_ kalau mau Japri nyala terus.
 

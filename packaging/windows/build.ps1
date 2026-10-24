@@ -49,7 +49,8 @@ Push-Location packaging\windows\launcher
 Run "rsrc (ikon)" { go run github.com/akavel/rsrc@v0.10.2 -ico ..\japri.ico -arch amd64 -o rsrc_windows_amd64.syso }
 $env:GOOS = "windows"; $env:GOARCH = "amd64"
 # -H windowsgui: Japri.exe jalan tanpa jendela console (cuma ikon di system tray)
-Run "go vet" { go vet . }
+# -unsafeptr=false: pointer dari Windows (lParam) memang perlu diubah ke struct
+Run "go vet" { go vet -unsafeptr=false . }
 Run "go build" { go build -ldflags "-s -w -H windowsgui" -o "$Stage\Japri.exe" . }
 Remove-Item rsrc_windows_amd64.syso
 Pop-Location

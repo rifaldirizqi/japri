@@ -10,8 +10,10 @@
 // jadi tetap aman waktu Japri di-update atau di-install ulang.
 //
 // Cara kerjanya:
-//   - Japri.exe jalan tanpa jendela, cuma ikon di system tray. Bot-nya (node) jalan di belakang,
-//     output-nya ditulis ke japri.log, dan dinyalain ulang sendiri kalau crash.
+//   - Japri.exe punya jendela (status, tombol, log) dan ikon di system tray. Jendelanya ditutup =
+//     sembunyi ke tray. Bot-nya (node) jalan di belakang tanpa jendela, output-nya ditulis ke
+//     japri.log + ditampilin di jendela, dan dinyalain ulang sendiri kalau crash.
+//   - Japri.exe --tray (autostart) langsung ke tray tanpa buka jendela.
 //   - Setup (wizard, scan QR, klaim owner) butuh tempat ngetik, jadi dijalanin di jendela console
 //     terpisah: Japri.exe manggil dirinya sendiri pakai argumen "__console".
 //   - Cuma satu Japri yang boleh jalan. Kalau dibuka lagi, yang lama dikabarin lewat pesan window.
@@ -112,16 +114,19 @@ func main() {
 	// Satu Japri aja. Kalau udah ada, kabarin yang lama (dia yang nampilin notifikasi / buka setup).
 	// Handle mutex sengaja gak ditutup: dipegang sampai Japri keluar.
 	if _, _, e := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(utf16Ptr(`Local\JapriTray`)))); e == syscall.Errno(errorAlreadyExists) {
-		if h := findRunning(); h != 0 {
+		if h := findRunning(); h != 0 && arg != "--tray" {
 			msg := uintptr(wmShowRunning)
 			if arg == "setup" {
 				msg = wmRunSetup
 			}
+			procAllowSetForegroundWindow.Call(^uintptr(0)) // ASFW_ANY: biar jendela Japri yang lama boleh maju ke depan
 			procPostMessageW.Call(h, msg, 0, 0)
 		}
 		return
 	}
 
+	// --tray: autostart waktu Windows nyala, langsung ke tray tanpa buka jendela
+	showWindow := arg != "--tray"
 	firstSetup := setupNeeded(p)
 	if arg == "setup" && firstSetup == "" {
 		firstSetup = "setup"
@@ -134,7 +139,7 @@ func main() {
 		os.Exit(1)
 	}
 	s.t = t
-	go s.run(firstSetup)
+	go s.run(firstSetup, showWindow)
 	messageLoop()
 	s.killNow()
 }

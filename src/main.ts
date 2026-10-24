@@ -1,6 +1,6 @@
 import { configExists, loadConfig } from "./config.js";
 import { handleMessage, hasOwner, introduceToGroup, pairingInfo, whenOwnerClaimed } from "./bot.js";
-import { acquireSingleInstanceLock, isDesktop } from "./desktop.js";
+import { acquireSingleInstanceLock, isDesktop, reportInfo } from "./desktop.js";
 import { startScheduler } from "./scheduler.js";
 import { runWizard } from "./setup/wizard.js";
 import { botNumber, connect } from "./wa/client.js";
@@ -30,7 +30,7 @@ process.on("SIGTERM", () => process.exit(0));
 if (isDesktop && !acquireSingleInstanceLock()) {
   console.log(
     "ℹ️  Japri udah jalan (cek ikon Japri di system tray, pojok kanan bawah).\n" +
-      (setupOnly ? "   Keluarin dulu Japri dari menu tray-nya, baru buka \"Ganti pengaturan AI\" lagi.\n" : ""),
+      (setupOnly ? "   Pakai tombol \"Ganti pengaturan AI\" di jendela Japri.\n" : ""),
   );
   process.exit(2);
 }
@@ -54,10 +54,12 @@ await connect({
   onMessage: handleMessage,
   onJoinedGroup: introduceToGroup,
   onReady: () => {
+    const { llm } = loadConfig();
+    reportInfo({ bot: botNumber(), ai: `${llm.provider} / ${llm.model}` });
     if (!hasOwner()) {
       console.log(pairingInfo());
     } else if (!readyOnce) {
-      const { botName, llm } = loadConfig();
+      const { botName } = loadConfig();
       console.log(`🤖 ${botName} siap di wa.me/${botNumber()} — AI: ${llm.provider}/${llm.model}`);
     }
     if (setupOnly && hasOwner()) finishSetup();
@@ -72,8 +74,8 @@ whenOwnerClaimed(() => {
 
 function finishSetup() {
   if (isDesktop) {
-    console.log("\n🎉 Setup selesai! Jendela ini bakal ketutup sendiri, terus Japri jalan di system tray");
-    console.log("   (ikon Japri di pojok kanan bawah, deket jam).\n");
+    console.log("\n🎉 Setup selesai! Jendela ini bakal ketutup sendiri, terus jendela Japri kebuka.");
+    console.log("   Jendela Japri boleh ditutup kapan aja: Japri tetap jalan di system tray (pojok kanan bawah).\n");
   } else {
     const next = process.env.RUNNING_IN_DOCKER ? "docker compose up -d" : "npm start";
     console.log(`\n🎉 Setup selesai! Jalankan botnya:\n     ${next}\n`);

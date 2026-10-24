@@ -1,6 +1,6 @@
 // Mode desktop: dipakai waktu Japri dijalanin dari installer Windows (Japri.exe set JAPRI_DESKTOP=1).
 // Tujuannya biar ramah buat orang awam: QR dibuka di browser, dan Japri gak bisa jalan dobel.
-// Kalau jalan di system tray (JAPRI_TRAY=1), status koneksi dilaporin ke Japri.exe lewat stdout.
+// Kalau jalan di belakang Japri.exe (JAPRI_TRAY=1), status & info dilaporin ke jendela Japri lewat stdout.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -12,9 +12,14 @@ export const isTray = !!process.env.JAPRI_TRAY;
 
 export type Status = "connecting" | "qr" | "ready";
 
-/** Kabarin ikon tray (dibaca Japri.exe; baris ini gak ikut ke log). */
+/** Kabarin jendela & ikon tray (dibaca Japri.exe; baris ini gak ikut ke log). */
 export function reportStatus(status: Status) {
   if (isTray) process.stdout.write(`@@japri-status ${status}\n`);
+}
+
+/** Nomor bot & model AI buat ditampilin di jendela Japri. */
+export function reportInfo(info: { bot?: string; ai?: string }) {
+  if (isTray) process.stdout.write(`@@japri-info ${JSON.stringify(info)}\n`);
 }
 
 const QR_PAGE = path.join(DATA_DIR, "qr.html");

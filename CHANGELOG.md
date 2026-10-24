@@ -12,7 +12,7 @@ Format tiap versi: `## [x.y.z] - YYYY-MM-DD`, terus daftar poin (`- ...`) pakai 
 - Cari pesan lama: _"siapa yang ngirim nomor rekening kemarin?"_, dijawab lengkap sama grup, pengirim, dan jamnya
 - Atur notif per grup: semua, cuma kalau di-tag, atau mati. Contoh: _"matiin notif grup alumni"_
 - Jam tenang: _"jangan ganggu jam 10 malam sampai 6 pagi"_. Notif ditahan, terus dikirim jadi satu pesan. Reminder tetap jalan
-- Windows: Japri sekarang jalan di system tray (ikon deket jam), gak ada lagi jendela hitam yang bisa ketutup gak sengaja. Kalau crash, nyala ulang sendiri
+- Windows: jendela Japri yang baru, isinya status, nomor bot, model AI, tombol, dan log. Jendelanya boleh ditutup: Japri tetap jalan di system tray (ikon deket jam). Kalau crash, nyala ulang sendiri
 - Windows: kalau WhatsApp nomor bot ke-logout, halaman QR langsung kebuka lagi buat scan ulang
 
 ## [0.1.0] - 2026-10-24

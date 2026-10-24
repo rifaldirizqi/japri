@@ -1,11 +1,15 @@
 package main
 
 // Ikon Japri di system tray: status, tooltip, menu klik kanan, dan notifikasi Windows (balon).
+// Window tray ini juga jadi "pusat pesan": status & log dari goroutine lain lewat sini ke jendela Japri.
 
 import (
 	_ "embed"
+	"os"
+	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -25,8 +29,10 @@ const (
 	wmTrayRefresh  = wmApp + 2 // status berubah (dikirim dari goroutine lain)
 	wmShowRunning  = wmApp + 3 // Japri.exe dibuka lagi padahal udah jalan
 	wmRunSetup     = wmApp + 4 // shortcut "Ganti pengaturan AI" dibuka padahal udah jalan
+	wmLogAppend    = wmApp + 5 // ada baris log baru
+	wmShowMain     = wmApp + 6 // buka jendela Japri
 
-	menuLog = iota + 1
+	menuOpen = iota + 1
 	menuSetup
 	menuDataDir
 	menuQuit
@@ -46,7 +52,7 @@ const (
 )
 
 var stateText = map[state]string{
-	stSetup:      "Lagi setup (lihat jendela Japri)",
+	stSetup:      "Lagi setup (lihat jendela setup)",
 	stConnecting: "Lagi nyambung ke WhatsApp…",
 	stReady:      "Jalan normal",
 	stQR:         "Perlu scan QR ulang",
@@ -67,12 +73,17 @@ type tray struct {
 	onCmd  func(cmd int) // dipanggil dari thread UI; harus cepat (gak boleh nunggu)
 	onExit func()        // Windows mau dimatiin
 
-	mu      sync.Mutex
-	st      state
-	pending *balloon
+	mu         sync.Mutex
+	st         state
+	info       botInfo
+	pending    *balloon
+	logBuf     []string // baris terakhir buat jendela Japri
+	logPending []string // belum ditempel ke jendela
 
 	taskbarCreated uint32
 }
+
+type botInfo struct{ bot, ai string }
 
 var theTray *tray
 
@@ -108,8 +119,91 @@ func newTray(p paths, onCmd func(int), onExit func()) (*tray, error) {
 		stConnecting: loadIcon(icoConnecting, int(size)),
 		stAttention:  loadIcon(icoAttention, int(size)),
 	}
+	t.seedLog()
 	t.refresh()
 	return t, nil
+}
+
+// seedLog: ambil baris-baris terakhir japri.log, biar jendela Japri gak kosong pas baru dibuka.
+func (t *tray) seedLog() {
+	f, err := os.Open(t.paths.log)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	if st, err := f.Stat(); err == nil && st.Size() > 64<<10 {
+		_, _ = f.Seek(st.Size()-64<<10, 0)
+	}
+	buf := make([]byte, 64<<10)
+	n, _ := f.Read(buf)
+	lines := strings.Split(strings.ReplaceAll(string(buf[:n]), "\r", ""), "\n")
+	if len(lines) > 0 && n == len(buf) {
+		lines = lines[1:] // baris pertama kemungkinan kepotong
+	}
+	for _, l := range lines {
+		if len(l) > 11 && l[4] == '-' && l[10] == ' ' {
+			l = l[11:] // buang tanggal, sisain jam
+		}
+		if strings.TrimSpace(l) != "" {
+			t.logBuf = append(t.logBuf, l)
+		}
+	}
+	if len(t.logBuf) > maxWindowLines {
+		t.logBuf = t.logBuf[len(t.logBuf)-maxWindowLines:]
+	}
+}
+
+// appendLog aman dipanggil dari goroutine mana aja.
+func (t *tray) appendLog(line string) {
+	l := time.Now().Format("15:04:05") + "  " + line
+	t.mu.Lock()
+	t.logBuf = append(t.logBuf, l)
+	if len(t.logBuf) > maxWindowLines {
+		t.logBuf = t.logBuf[len(t.logBuf)-maxWindowLines:]
+	}
+	t.logPending = append(t.logPending, l)
+	t.mu.Unlock()
+	procPostMessageW.Call(t.hwnd, wmLogAppend, 0, 0)
+}
+
+func (t *tray) logLines() []string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.logPending = nil
+	return append([]string(nil), t.logBuf...)
+}
+
+func (t *tray) setInfo(i botInfo) {
+	t.mu.Lock()
+	if i.bot != "" {
+		t.info.bot = i.bot
+	}
+	if i.ai != "" {
+		t.info.ai = i.ai
+	}
+	t.mu.Unlock()
+	procPostMessageW.Call(t.hwnd, wmTrayRefresh, 0, 0)
+}
+
+func (t *tray) snapshot() (state, botInfo) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.st, t.info
+}
+
+// showMain buka jendela Japri (aman dari goroutine mana aja).
+func (t *tray) showMain() {
+	procPostMessageW.Call(t.hwnd, wmShowMain, 0, 0)
+}
+
+func (t *tray) openMain() {
+	if theWindow == nil {
+		if _, err := newMainWindow(t); err != nil {
+			messageBox("Japri", "Gagal buka jendela Japri: "+err.Error())
+			return
+		}
+	}
+	theWindow.show()
 }
 
 // stAttention cuma dipakai buat milih ikon
@@ -206,13 +300,14 @@ func (t *tray) showMenu() {
 	}
 	add(mfString|mfGrayed, 0, "Japri: "+stateText[s])
 	add(mfSeparator, 0, "")
+	add(mfString, menuOpen, "Buka Japri")
+	procSetMenuDefaultItem.Call(m, menuOpen, 0)
 	if s == stQR {
 		add(mfString, menuQR, "Buka halaman QR")
 	}
 	if s == stFailed {
 		add(mfString, menuRetry, "Coba jalanin lagi")
 	}
-	add(mfString, menuLog, "Lihat log")
 	if s != stSetup {
 		add(mfString, menuSetup, "Ganti pengaturan AI")
 	}
@@ -229,8 +324,8 @@ func (t *tray) showMenu() {
 	procDestroyMenu.Call(m)
 
 	switch int(cmd) {
-	case menuLog:
-		shellOpen("notepad.exe", syscall.EscapeArg(t.paths.log))
+	case menuOpen:
+		t.openMain()
 	case menuDataDir:
 		shellOpen(t.paths.data, "")
 	case menuQR:
@@ -245,19 +340,35 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 	switch {
 	case msg == wmTrayCallback:
 		switch lParam & 0xFFFF {
-		case wmLButtonUp, wmRButtonUp:
+		case wmLButtonUp:
+			t.openMain()
+		case wmRButtonUp:
 			t.showMenu()
 		case ninBalloonUserClick:
 			if t.state() == stQR {
 				shellOpen(t.paths.qr, "")
+			} else {
+				t.openMain()
 			}
 		}
 		return 0
 	case msg == wmTrayRefresh:
 		t.refresh()
+		if theWindow != nil {
+			theWindow.refresh()
+		}
 		return 0
-	case msg == wmShowRunning:
-		t.notify(balloon{title: "Japri udah jalan", text: "Japri jalan di sini. Klik ikon ini buat lihat menunya."})
+	case msg == wmLogAppend:
+		t.mu.Lock()
+		lines := t.logPending
+		t.logPending = nil
+		t.mu.Unlock()
+		if theWindow != nil && len(lines) > 0 {
+			theWindow.appendLog(lines)
+		}
+		return 0
+	case msg == wmShowRunning, msg == wmShowMain:
+		t.openMain()
 		return 0
 	case msg == wmRunSetup:
 		t.onCmd(menuSetup)
@@ -276,6 +387,9 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 		return 0
 	case msg == wmClose:
 		t.remove()
+		if theWindow != nil {
+			procDestroyWindow.Call(theWindow.hwnd)
+		}
 		procDestroyWindow.Call(hwnd)
 		return 0
 	case msg == wmDestroy:

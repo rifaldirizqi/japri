@@ -58,21 +58,23 @@ Catch-up yang dikirim otomatis tiap hari di jam yang owner pilih.
 | F4.5 | Reminder **tetap** dikirim di jam tenang, karena owner sendiri yang masang jamnya. Kabar update ditahan sampai jam tenang selesai. |
 | F4.6 | _"Notif gue gimana?"_ nampilin mode tiap grup + jam tenang. |
 
-### F5. Jalan di system tray (Windows)
+### F5. Jendela Japri + system tray (Windows)
 
-Sekarang Japri jalan di jendela hitam yang gak boleh ditutup. Buat user awam itu rawan: sekali ketutup, bot mati tanpa mereka sadar. v0.2.0 mindahin Japri ke **system tray** (ikon kecil di pojok kanan bawah, deket jam).
+Di v0.1.0, Japri jalan di jendela hitam yang gak boleh ditutup. Buat user awam itu rawan: sekali ketutup, bot mati tanpa mereka sadar. v0.2.0 ngasih Japri **jendela sendiri** yang bisa ditutup kapan aja, karena Japri tetap jalan di **system tray** (ikon kecil di pojok kanan bawah, deket jam).
 
 | # | Requirement |
 |---|---|
-| F5.1 | Setelah setup selesai, Japri jalan **tanpa jendela**, cuma ikon Japri di system tray. Termasuk pas autostart waktu Windows nyala. |
-| F5.2 | Ikon nunjukin status: **jalan normal**, **lagi nyambung**, atau **butuh perhatian** (misalnya perlu scan QR ulang, atau error). Arahin mouse ke ikon → muncul tulisan statusnya. |
-| F5.3 | Klik kanan ikon → menu: status sekarang · **Lihat log** · **Ganti pengaturan AI** · **Buka folder data** · **Keluar**. |
-| F5.4 | **Setup pertama** (wizard, API key) tetap pakai jendela kayak sekarang. Abis setup selesai, jendelanya ketutup sendiri dan Japri pindah ke tray. |
-| F5.5 | Kalau WhatsApp minta scan QR ulang pas Japri di tray: muncul notifikasi Windows, terus halaman QR kebuka di browser (kayak sekarang). |
-| F5.6 | Kalau bot-nya crash, Japri nyoba nyalain ulang sendiri. Kalau gagal terus (3× dalam 5 menit), ikon berubah jadi "butuh perhatian", plus notifikasi Windows. |
-| F5.7 | Japri cuma berhenti kalau dipilih **Keluar** di menu tray, atau pas Windows dimatiin. Gak ada lagi jendela yang bisa ketutup gak sengaja. |
-| F5.8 | Tetap cuma satu Japri yang jalan. Dobel-klik ikon Japri pas udah jalan → cukup nampilin notifikasi "Japri udah jalan di tray". |
-| F5.9 | Docker & Node.js gak berubah. Fitur ini khusus installer Windows. |
+| F5.1 | Japri punya jendela sendiri, isinya: **status** (jalan normal / lagi nyambung / butuh perhatian), **nomor bot**, **model AI**, tombol **Ganti pengaturan AI**, **Buka folder data**, **Keluar**, dan **log** di bawahnya. |
+| F5.2 | Jendelanya kebuka kalau Japri dibuka dari ikon Desktop / Start Menu, atau ikon tray-nya diklik. |
+| F5.3 | Tombol **X** atau minimize → jendela **sembunyi ke tray**, bot tetap jalan. Pertama kali, muncul notifikasi _"Japri masih jalan di tray"_. |
+| F5.4 | Pas autostart waktu Windows nyala, Japri langsung ke tray **tanpa** buka jendela. |
+| F5.5 | Ikon tray nunjukin status yang sama (beda warna), plus tulisan statusnya kalau mouse diarahin ke ikon. Klik kanan → menu: status · **Buka Japri** · **Ganti pengaturan AI** · **Buka folder data** · **Keluar**. |
+| F5.6 | **Setup pertama** (wizard, API key, scan QR, kode setup) tetap pakai jendela console kayak sekarang, karena butuh tempat ngetik. Abis setup selesai, jendela console ketutup sendiri dan jendela Japri kebuka. |
+| F5.7 | Kalau WhatsApp minta scan QR ulang: notifikasi Windows, halaman QR kebuka di browser, dan di jendela Japri muncul tombol **Buka halaman QR**. |
+| F5.8 | Kalau bot-nya crash, Japri nyoba nyalain ulang sendiri. Kalau gagal terus (3× dalam 5 menit), status jadi "butuh perhatian", plus notifikasi Windows dan tombol **Coba jalanin lagi**. |
+| F5.9 | Japri cuma berhenti kalau dipilih **Keluar** (tombol di jendela atau menu tray), atau pas Windows dimatiin. |
+| F5.10 | Tetap cuma satu Japri yang jalan. Kalau dibuka lagi pas udah jalan, jendela Japri yang udah ada dimunculin. |
+| F5.11 | Docker & Node.js gak berubah. Fitur ini khusus installer Windows. |
 
 ## 3. Kebutuhan non-fungsional
 
@@ -98,4 +100,4 @@ Disepakati:
 3. Notif selama jam tenang ditahan, terus dikirim jadi satu pesan (F4.4).
 4. Digest yang telat dikirim kalau belum lewat 12 jam (F2.4).
 5. Opsi digest "hari kerja aja" ditunda (F2.5).
-6. F5 (system tray), termasuk setup pertama tetap pakai jendela (F5.4) dan crash otomatis dinyalain ulang (F5.6).
+6. F5: Japri punya jendela (status + tombol + log). Tombol X nyembunyiin ke tray, bukan matiin (F5.3). Setup pertama tetap pakai jendela console (F5.6), dan crash otomatis dinyalain ulang (F5.8).

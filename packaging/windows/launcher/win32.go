@@ -33,6 +33,25 @@ var (
 	procGetSystemMetrics         = user32.NewProc("GetSystemMetrics")
 	procSetProcessDPIAware       = user32.NewProc("SetProcessDPIAware")
 	procMessageBoxW              = user32.NewProc("MessageBoxW")
+	procShowWindow               = user32.NewProc("ShowWindow")
+	procIsWindowVisible          = user32.NewProc("IsWindowVisible")
+	procSendMessageW             = user32.NewProc("SendMessageW")
+	procSetWindowTextW           = user32.NewProc("SetWindowTextW")
+	procMoveWindow               = user32.NewProc("MoveWindow")
+	procEnableWindow             = user32.NewProc("EnableWindow")
+	procGetDC                    = user32.NewProc("GetDC")
+	procReleaseDC                = user32.NewProc("ReleaseDC")
+	procGetSysColor              = user32.NewProc("GetSysColor")
+	procGetSysColorBrush         = user32.NewProc("GetSysColorBrush")
+	procLoadCursorW              = user32.NewProc("LoadCursorW")
+	procAllowSetForegroundWindow = user32.NewProc("AllowSetForegroundWindow")
+	procSetMenuDefaultItem       = user32.NewProc("SetMenuDefaultItem")
+
+	gdi32             = syscall.NewLazyDLL("gdi32.dll")
+	procCreateFontW   = gdi32.NewProc("CreateFontW")
+	procGetDeviceCaps = gdi32.NewProc("GetDeviceCaps")
+	procSetTextColor  = gdi32.NewProc("SetTextColor")
+	procSetBkColor    = gdi32.NewProc("SetBkColor")
 
 	procCreateMutexW       = kernel32.NewProc("CreateMutexW")
 	procGetModuleHandleW   = kernel32.NewProc("GetModuleHandleW")
@@ -82,6 +101,42 @@ const (
 	smCxSmIcon = 49
 
 	errorAlreadyExists = 183
+
+	wmSize           = 0x0005
+	wmSetFont        = 0x0030
+	wmGetMinMaxInfo  = 0x0024
+	wmSetIcon        = 0x0080
+	wmCommand        = 0x0111
+	wmSysCommand     = 0x0112
+	wmCtlColorStatic = 0x0138
+	scMinimize       = 0xF020
+	emSetSel         = 0x00B1
+	emScrollCaret    = 0x00B7
+	emReplaceSel     = 0x00C2
+	emSetLimitText   = 0x00C5
+	wmGetTextLength  = 0x000E
+
+	wsOverlappedWindow = 0x00CF0000
+	wsChild            = 0x40000000
+	wsVisible          = 0x10000000
+	wsVScroll          = 0x00200000
+	wsTabStop          = 0x00010000
+	wsExClientEdge     = 0x00000200
+	esMultiline        = 0x0004
+	esAutoVScroll      = 0x0040
+	esReadOnly         = 0x0800
+	ssNoPrefix         = 0x0080
+	ssEndEllipsis      = 0x4000
+	cwUseDefault       = 0x80000000
+
+	swHide    = 0
+	swShow    = 5
+	swRestore = 9
+
+	colorWindow     = 5
+	colorWindowText = 8
+	logPixelsY      = 90
+	idcArrow        = 32512
 
 	mbOK          = 0x00000000
 	mbIconWarning = 0x00000030
