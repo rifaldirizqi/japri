@@ -6,94 +6,135 @@
 //	node\node.exe    ← Node.js portable
 //	app\             ← kode Japri + node_modules
 //
-// Data (session WA, database, pengaturan) disimpan di %LOCALAPPDATA%\Japri\data,
+// Data (session WA, database, pengaturan, log) disimpan di %LOCALAPPDATA%\Japri\data,
 // jadi tetap aman waktu Japri di-update atau di-install ulang.
+//
+// Cara kerjanya:
+//   - Japri.exe jalan tanpa jendela, cuma ikon di system tray. Bot-nya (node) jalan di belakang,
+//     output-nya ditulis ke japri.log, dan dinyalain ulang sendiri kalau crash.
+//   - Setup (wizard, scan QR, klaim owner) butuh tempat ngetik, jadi dijalanin di jendela console
+//     terpisah: Japri.exe manggil dirinya sendiri pakai argumen "__console".
+//   - Cuma satu Japri yang boleh jalan. Kalau dibuka lagi, yang lama dikabarin lewat pesan window.
 package main
 
 import (
-	"bufio"
-	"errors"
-	"fmt"
+	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"unsafe"
 )
 
-var kernel32 = syscall.NewLazyDLL("kernel32.dll")
-
-// prepareConsole: judul jendela, UTF-8 (biar emoji & QR tampil), dan matiin QuickEdit.
-// QuickEdit bikin program "nge-freeze" kalau user gak sengaja ngeklik jendela console.
-func prepareConsole() {
-	if title, err := syscall.UTF16PtrFromString("Japri"); err == nil {
-		kernel32.NewProc("SetConsoleTitleW").Call(uintptr(unsafe.Pointer(title)))
-	}
-	kernel32.NewProc("SetConsoleOutputCP").Call(65001)
-	kernel32.NewProc("SetConsoleCP").Call(65001)
-
-	const enableQuickEditMode = 0x0040
-	const enableExtendedFlags = 0x0080
-	stdin, err := syscall.GetStdHandle(syscall.STD_INPUT_HANDLE)
-	if err != nil {
-		return
-	}
-	var mode uint32
-	if r, _, _ := kernel32.NewProc("GetConsoleMode").Call(uintptr(stdin), uintptr(unsafe.Pointer(&mode))); r == 0 {
-		return
-	}
-	mode = (mode &^ enableQuickEditMode) | enableExtendedFlags
-	kernel32.NewProc("SetConsoleMode").Call(uintptr(stdin), uintptr(mode))
+type paths struct {
+	exe, node, app, data, log, qr, config, lock string
 }
 
-func waitForEnter(msg string) {
-	fmt.Println()
-	fmt.Println(msg)
-	fmt.Println("Tekan Enter buat nutup jendela ini.")
-	bufio.NewReader(os.Stdin).ReadString('\n')
+func resolvePaths() (paths, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return paths{}, err
+	}
+	base := filepath.Dir(exe)
+	data := filepath.Join(os.Getenv("LOCALAPPDATA"), "Japri", "data")
+	return paths{
+		exe:    exe,
+		node:   filepath.Join(base, "node", "node.exe"),
+		app:    filepath.Join(base, "app"),
+		data:   data,
+		log:    filepath.Join(data, "japri.log"),
+		qr:     filepath.Join(data, "qr.html"),
+		config: filepath.Join(data, "config.json"),
+		lock:   filepath.Join(data, "japri.lock"),
+	}, nil
+}
+
+// setupNeeded: "setup" kalau belum pernah setup, "pair" kalau pengaturan AI udah ada tapi owner belum
+// klaim (mis. jendela setup ketutup pas scan QR), "" kalau udah lengkap.
+func setupNeeded(p paths) string {
+	raw, err := os.ReadFile(p.config)
+	if err != nil {
+		return "setup"
+	}
+	var cfg struct {
+		Owner *struct {
+			IDs []string `json:"ids"`
+		} `json:"owner"`
+	}
+	if json.Unmarshal(raw, &cfg) != nil {
+		return "setup"
+	}
+	if cfg.Owner == nil || len(cfg.Owner.IDs) == 0 {
+		return "pair"
+	}
+	return ""
+}
+
+// nodeArgs: argumen node.exe buat ngejalanin Japri (mode = "", "setup", atau "pair").
+func nodeArgs(p paths, mode string) []string {
+	args := []string{
+		filepath.Join(p.app, "node_modules", "tsx", "dist", "cli.mjs"),
+		filepath.Join(p.app, "src", "main.ts"),
+	}
+	if mode != "" {
+		args = append(args, mode)
+	}
+	return args
 }
 
 func main() {
-	prepareConsole()
+	// Window & message loop Win32 harus tetap di thread yang sama
+	runtime.LockOSThread()
+	procSetProcessDPIAware.Call()
 
-	exe, err := os.Executable()
+	p, err := resolvePaths()
 	if err != nil {
-		waitForEnter("Gagal nemuin lokasi Japri: " + err.Error())
+		messageBox("Japri", "Gagal nemuin lokasi Japri: "+err.Error())
 		os.Exit(1)
 	}
-	base := filepath.Dir(exe)
-	node := filepath.Join(base, "node", "node.exe")
-	app := filepath.Join(base, "app")
-
-	dataDir := filepath.Join(os.Getenv("LOCALAPPDATA"), "Japri", "data")
-	if err := os.MkdirAll(dataDir, 0o700); err != nil {
-		waitForEnter("Gagal bikin folder data: " + err.Error())
+	if err := os.MkdirAll(p.data, 0o700); err != nil {
+		messageBox("Japri", "Gagal bikin folder data: "+err.Error())
 		os.Exit(1)
 	}
 
-	args := append([]string{
-		filepath.Join(app, "node_modules", "tsx", "dist", "cli.mjs"),
-		filepath.Join(app, "src", "main.ts"),
-	}, os.Args[1:]...)
+	arg := ""
+	if len(os.Args) > 1 {
+		arg = os.Args[1]
+	}
+	if arg == "__console" {
+		mode := ""
+		if len(os.Args) > 2 {
+			mode = os.Args[2]
+		}
+		os.Exit(runConsole(p, mode))
+	}
 
-	cmd := exec.Command(node, args...)
-	cmd.Dir = app
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	cmd.Env = append(os.Environ(), "DATA_DIR="+dataDir, "JAPRI_DESKTOP=1", "FORCE_COLOR=1")
+	// Satu Japri aja. Kalau udah ada, kabarin yang lama (dia yang nampilin notifikasi / buka setup).
+	// Handle mutex sengaja gak ditutup: dipegang sampai Japri keluar.
+	if _, _, e := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(utf16Ptr(`Local\JapriTray`)))); e == syscall.Errno(errorAlreadyExists) {
+		if h := findRunning(); h != 0 {
+			msg := uintptr(wmShowRunning)
+			if arg == "setup" {
+				msg = wmRunSetup
+			}
+			procPostMessageW.Call(h, msg, 0, 0)
+		}
+		return
+	}
 
-	err = cmd.Run()
-	var exitErr *exec.ExitError
-	switch {
-	case err == nil:
-		waitForEnter("Japri udah berhenti.")
-	case errors.As(err, &exitErr) && exitErr.ExitCode() == 2:
-		// Japri udah jalan di jendela lain; pesannya udah dicetak sama aplikasinya
-		waitForEnter("")
-	case errors.As(err, &exitErr):
-		waitForEnter(fmt.Sprintf("❌ Japri berhenti karena error (kode %d). Cek pesan di atas.", exitErr.ExitCode()))
-		os.Exit(exitErr.ExitCode())
-	default:
-		waitForEnter("❌ Gagal ngejalanin Japri: " + err.Error() + "\nCoba install ulang Japri.")
+	firstSetup := setupNeeded(p)
+	if arg == "setup" && firstSetup == "" {
+		firstSetup = "setup"
+	}
+
+	s := &supervisor{p: p, cmds: make(chan int, 4)}
+	t, err := newTray(p, s.command, s.killNow)
+	if err != nil {
+		messageBox("Japri", "Gagal bikin ikon Japri di system tray: "+err.Error())
 		os.Exit(1)
 	}
+	s.t = t
+	go s.run(firstSetup)
+	messageLoop()
+	s.killNow()
 }

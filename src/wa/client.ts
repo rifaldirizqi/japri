@@ -15,9 +15,10 @@ import makeWASocket, {
 import { HttpsProxyAgent } from "https-proxy-agent";
 import pino from "pino";
 import qrcode from "qrcode-terminal";
+import fs from "node:fs";
 import { AUTH_DIR } from "../config.js";
 import * as store from "../db.js";
-import { isDesktop, markConnected, showQrInBrowser } from "../desktop.js";
+import { isDesktop, isTray, markConnected, reportStatus, showQrInBrowser } from "../desktop.js";
 
 export type IncomingMessage = {
   raw: WAMessage;
@@ -154,6 +155,7 @@ async function parse(msg: WAMessage): Promise<IncomingMessage | null> {
 
 export async function connect(handlers: Handlers) {
   console.log("📡 Nyambung ke WhatsApp...");
+  reportStatus("connecting");
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const { version } = await fetchLatestBaileysVersion();
 
@@ -168,6 +170,7 @@ export async function connect(handlers: Handlers) {
 
   sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
     if (qr) {
+      reportStatus("qr");
       if (isDesktop) {
         await showQrInBrowser(qr).catch((e) => console.error("Gagal buka QR di browser:", e));
         console.log("\n📱 QR buat nyambungin WhatsApp udah kebuka di browser. Scan pakai HP nomor BOT.");
@@ -176,7 +179,7 @@ export async function connect(handlers: Handlers) {
         console.log("\n📱 Scan QR ini pakai HP nomor BOT:");
         console.log("   WhatsApp → ⋮ / Pengaturan → Perangkat tertaut → Tautkan perangkat\n");
       }
-      qrcode.generate(qr, { small: true });
+      if (!isTray) qrcode.generate(qr, { small: true });
     }
     if (connection === "open") {
       retryDelay = 3000;
@@ -191,14 +194,24 @@ export async function connect(handlers: Handlers) {
       } catch (e) {
         console.error("Gagal sinkron daftar grup:", e);
       }
+      reportStatus("ready");
       handlers.onReady();
     }
     if (connection === "close") {
       const code = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
-        console.error("\n❌ Bot di-logout dari WhatsApp. Hapus folder data/auth lalu jalankan ulang buat scan QR baru.");
-        process.exit(1);
+        if (!isDesktop) {
+          console.error("\n❌ Bot di-logout dari WhatsApp. Hapus folder data/auth lalu jalankan ulang buat scan QR baru.");
+          process.exit(1);
+        }
+        // Desktop: langsung minta scan QR baru (halamannya kebuka di browser)
+        console.log("\n⚠️  Nomor bot ke-logout dari WhatsApp. Scan QR baru buat nyambungin lagi.");
+        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        retryDelay = 3000;
+        setTimeout(() => connect(handlers), 1000);
+        return;
       }
+      reportStatus("connecting");
       const reason = lastDisconnect?.error?.message ?? "tanpa keterangan";
       console.log(`🔄 Koneksi WhatsApp putus (${code ?? "-"}: ${reason}). Nyambung ulang dalam ${retryDelay / 1000} detik...`);
       setTimeout(() => connect(handlers), retryDelay);

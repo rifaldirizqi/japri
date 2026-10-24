@@ -14,17 +14,23 @@ export function createAnthropic(cfg: LLMConfig): LLM {
   return {
     async run({ system, history, tools, maxIterations = 10 }: RunOptions) {
       const useFallback = FALLBACK_MODELS.has(cfg.model);
-      const final = await client.beta.messages.toolRunner({
+      const params = {
         model: cfg.model,
         max_tokens: 16000,
         ...(useFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
         ...(supportsEffort(cfg.model) ? { output_config: { effort: "medium" as const } } : {}),
-        cache_control: { type: "ephemeral" },
+        cache_control: { type: "ephemeral" as const },
         system,
-        tools: tools.map((t) => betaZodTool({ name: t.name, description: t.description, inputSchema: t.input, run: t.run })),
         messages: history.map((t) => ({ role: t.role, content: t.text })),
-        max_iterations: maxIterations,
-      });
+      };
+      const final =
+        tools.length === 0
+          ? await client.beta.messages.create(params)
+          : await client.beta.messages.toolRunner({
+              ...params,
+              tools: tools.map((t) => betaZodTool({ name: t.name, description: t.description, inputSchema: t.input, run: t.run })),
+              max_iterations: maxIterations,
+            });
 
       if (final.stop_reason === "refusal") return "Maaf, permintaan ini gak bisa gue proses.";
       return final.content

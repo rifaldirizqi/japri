@@ -29,6 +29,12 @@ export type Config = {
   checkUpdates: boolean;
   /** Versi terakhir yang udah dikabarin ke owner (biar gak dikabarin berulang) */
   notifiedVersion?: string;
+  /** Digest harian; null/undefined = mati */
+  digest?: { time: string } | null;
+  /** Jadwal digest terakhir yang udah diurus (dikirim atau dilewati), biar gak dobel */
+  digestHandledTs?: number;
+  /** Jam tenang ("HH:MM"), boleh lewat tengah malam; null/undefined = mati */
+  quietHours?: { start: string; end: string } | null;
 };
 
 const DEFAULTS: Omit<Config, "llm"> = {

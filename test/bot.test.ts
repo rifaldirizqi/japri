@@ -80,3 +80,19 @@ test("keluar: non-admin ditolak, admin bikin bot keluar & data dihapus", async (
   assert.deepEqual(left, ["g@g.us"]); assert.equal(store.getMessages("g@g.us", 0).length, 0);
   assert.match(last().text, /ngeluarin gue/); assert.equal(last().to, "62811@s.whatsapp.net");
 });
+test("mode notif per grup: 'mentions' cuma tag & reply, 'off' gak ada notif tapi tetap dicatat", async () => {
+  store.upsertGroup("g2@g.us", "Alumni");
+  const g = (o: any) => bot.handleMessage(msg({ isGroup: true, chatJid: "g2@g.us", senderIds: ["62833@s.whatsapp.net"], ...o }));
+  store.setNotifyMode("g2@g.us", "mentions");
+  let before = sent.length;
+  await g({ text: "ndi ikut gak?" });
+  assert.equal(sent.length, before);
+  await g({ text: "@111 ikut gak?", mentionedIds: ["111@lid"] });
+  assert.equal(sent.length, before + 1);
+  store.setNotifyMode("g2@g.us", "off");
+  before = sent.length;
+  await g({ text: "@111 halo", mentionedIds: ["111@lid"] });
+  assert.equal(sent.length, before);
+  const saved = store.getMessages("g2@g.us", 0);
+  assert.equal(saved.length, 3); assert.deepEqual(saved.map((m) => m.for_owner), [1, 1, 1]);
+});

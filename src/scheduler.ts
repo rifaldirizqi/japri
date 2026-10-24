@@ -1,6 +1,7 @@
 import { loadConfig } from "./config.js";
 import * as store from "./db.js";
-import { ownerJid } from "./bot.js";
+import { runDigestIfDue } from "./digest.js";
+import { flushHeldNotifications, ownerJid, sendToOwner } from "./notify.js";
 import { formatHM, nowTs } from "./time.js";
 import { notifyIfUpdateAvailable } from "./updater.js";
 import { sendText } from "./wa/client.js";
@@ -31,18 +32,24 @@ async function sendDueReminders() {
   }
 }
 
+async function tick() {
+  await sendDueReminders();
+  await flushHeldNotifications().catch((e) => console.error("Gagal kirim notif yang ditahan:", e));
+  await runDigestIfDue(nowTs());
+}
+
 let started = false;
 export function startScheduler() {
   if (started) return;
   started = true;
-  setInterval(sendDueReminders, 20_000);
+  setInterval(tick, 20_000);
   setInterval(() => store.pruneMessages(nowTs() - loadConfig().retentionDays * 86400), 3600_000);
-  void sendDueReminders();
+  void tick();
 
   // Cek update: 1 menit setelah nyala, terus tiap 24 jam
+  // Kabar update ditahan kalau lagi jam tenang
   const checkUpdate = () => {
-    const to = ownerJid();
-    if (to) void notifyIfUpdateAvailable((text) => sendText(to, text)).catch((e) => console.error("Gagal cek update:", e));
+    if (ownerJid()) void notifyIfUpdateAvailable((text) => sendToOwner(text, "other")).catch((e) => console.error("Gagal cek update:", e));
   };
   setTimeout(checkUpdate, 60_000);
   setInterval(checkUpdate, 24 * 3600_000);

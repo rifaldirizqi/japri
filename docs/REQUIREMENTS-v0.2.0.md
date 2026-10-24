@@ -1,6 +1,6 @@
 # Requirements — Japri v0.2.0
 
-> Status: **F1–F4 disepakati. F5 (system tray) baru ditambahin, nunggu konfirmasi.**
+> Status: **Disepakati semua (F1–F5), udah diimplementasi.**
 > Requirement MVP (v0.1.0) ada di [REQUIREMENTS.md](REQUIREMENTS.md).
 
 ## 1. Tujuan
@@ -98,7 +98,4 @@ Disepakati:
 3. Notif selama jam tenang ditahan, terus dikirim jadi satu pesan (F4.4).
 4. Digest yang telat dikirim kalau belum lewat 12 jam (F2.4).
 5. Opsi digest "hari kerja aja" ditunda (F2.5).
-
-Nunggu konfirmasi:
-
-6. F5 (system tray) secara keseluruhan, terutama: setup pertama tetap pakai jendela (F5.4), dan crash otomatis dinyalain ulang (F5.6).
+6. F5 (system tray), termasuk setup pertama tetap pakai jendela (F5.4) dan crash otomatis dinyalain ulang (F5.6).

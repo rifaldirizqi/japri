@@ -3,6 +3,7 @@ import { jidNormalizedUser } from "baileys";
 import { loadConfig, updateConfig } from "./config.js";
 import * as store from "./db.js";
 import { ask, resetHistory } from "./agent/agent.js";
+import { ownerJid, sendToOwner } from "./notify.js";
 import { formatHM } from "./time.js";
 import { botNumber, groupAdminIds, leaveGroup, sendText, showTyping, type IncomingMessage } from "./wa/client.js";
 
@@ -15,11 +16,7 @@ const ownerIds = () => new Set(loadConfig().owner?.ids ?? []);
 export const hasOwner = () => ownerIds().size > 0;
 const isOwner = (ids: string[]) => ids.some((id) => ownerIds().has(id));
 
-/** JID buat DM owner (nomor lebih disukai daripada LID). */
-export function ownerJid(): string | null {
-  const ids = loadConfig().owner?.ids ?? [];
-  return ids.find((id) => id.endsWith("@s.whatsapp.net")) ?? ids[0] ?? null;
-}
+export { ownerJid };
 
 /** Kalau owner muncul dengan ID baru (mis. LID), ingat supaya mention via ID itu juga ketangkep. */
 function rememberOwnerIds(ids: string[]) {
@@ -39,7 +36,8 @@ async function claimOwner(m: IncomingMessage) {
     m.chatJid,
     `Halo ${m.senderName ?? ""}! 👋 Mulai sekarang gue asisten pribadi lo.\n\n` +
       `Satu hal dulu: biar gue bisa ngabarin kalau nama lo disebut di grup (walau gak di-tag), ` +
-      `kasih tau nama panggilan lo. Contoh: _"panggil gue andi atau ndi"_.\n\n${help()}`,
+      `kasih tau nama panggilan lo. Contoh: _"panggil gue andi atau ndi"_.\n\n` +
+      `Mau gue kirimin rangkuman semua grup tiap hari? Bilang aja jamnya, mis. _"kirim rangkuman tiap jam 9 malam"_.\n\n${help()}`,
   );
   onClaimed?.();
 }
@@ -50,14 +48,17 @@ const help = () => {
   const { botName } = loadConfig();
   return `*${botName}* 🤖 — cara pakai
 Ngobrol biasa aja, contoh:
+• gue ketinggalan apa?
 • rangkum grup kantor 3 jam terakhir
-• tadi di grup keluarga bahas apa aja?
+• siapa yang ngirim nomor rekening kemarin?
 • ingetin gue besok jam 9 kirim laporan
 • tiap senin jam 8 ingetin grup tim soal standup
-• reminder gue apa aja?
+• kirim rangkuman tiap jam 9 malam
+• matiin notif grup alumni
+• jangan ganggu jam 10 malam sampai 6 pagi
 • ada update Japri gak?
 
-Gue otomatis DM lo kalau ada yang tag lo, bales pesan lo, atau nyebut nama panggilan lo di grup.
+Gue otomatis DM lo kalau ada yang tag lo, bales pesan lo, atau nyebut nama panggilan lo di grup. Tanya _"notif gue gimana?"_ buat lihat pengaturannya.
 
 *Di grup:* tag gue atau awali dengan /ai, mis. "@${botName} rangkum 2 jam terakhir".
 *Perintah:* /help · /reset (lupain obrolan sebelumnya)`;
@@ -86,15 +87,18 @@ function notifyReason(m: IncomingMessage): string | null {
   return null;
 }
 
-async function notifyOwner(m: IncomingMessage, reason: string) {
-  const to = ownerJid();
-  if (!to) return;
+/** Mode notif grup: 'off' = gak ada notif, 'mentions' = cuma tag & reply (tanpa nama panggilan). */
+function shouldNotify(chat: store.Chat | undefined, reason: string) {
+  const mode = chat?.notify_mode ?? "all";
+  return mode === "all" || (mode === "mentions" && reason !== "nyebut nama lo");
+}
+
+async function notifyOwner(m: IncomingMessage, reason: string, group: string) {
   const { timezone } = loadConfig();
-  const group = store.getGroup(m.chatJid)?.name ?? "grup";
   const text = m.text.length > 700 ? `${m.text.slice(0, 700)}…` : m.text;
-  await sendText(
-    to,
+  await sendToOwner(
     `🔔 *${m.senderName ?? m.senderIds[0].split("@")[0]}* ${reason} di *${group}* (${formatHM(m.ts, timezone)}):\n> ${text.replace(/\n/g, "\n> ")}`,
+    "mention",
   );
 }
 
@@ -119,18 +123,20 @@ export async function handleMessage(m: IncomingMessage) {
 
 async function handleGroup(m: IncomingMessage, fromOwner: boolean) {
   store.upsertGroup(m.chatJid, null);
+  const reason = !fromOwner && hasOwner() ? notifyReason(m) : null;
   store.saveMessage({
     id: m.raw.key.id ?? `${m.ts}-${crypto.randomUUID()}`,
     chat_jid: m.chatJid,
     sender_name: m.senderName,
     from_owner: fromOwner ? 1 : 0,
+    for_owner: reason ? 1 : 0,
     text: m.text,
     ts: m.ts,
   });
 
-  if (!fromOwner && hasOwner()) {
-    const reason = notifyReason(m);
-    if (reason) await notifyOwner(m, reason).catch((e) => console.error("Gagal kirim notif:", e));
+  const chat = store.getGroup(m.chatJid);
+  if (reason && shouldNotify(chat, reason)) {
+    await notifyOwner(m, reason, chat?.name ?? "grup").catch((e) => console.error("Gagal kirim notif:", e));
   }
 
   if (!m.mentionsBot && !COMMAND_PREFIX.test(m.text)) return;

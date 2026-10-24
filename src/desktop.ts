@@ -1,5 +1,6 @@
 // Mode desktop: dipakai waktu Japri dijalanin dari installer Windows (Japri.exe set JAPRI_DESKTOP=1).
 // Tujuannya biar ramah buat orang awam: QR dibuka di browser, dan Japri gak bisa jalan dobel.
+// Kalau jalan di system tray (JAPRI_TRAY=1), status koneksi dilaporin ke Japri.exe lewat stdout.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -7,6 +8,14 @@ import QRCode from "qrcode";
 import { DATA_DIR } from "./config.js";
 
 export const isDesktop = !!process.env.JAPRI_DESKTOP;
+export const isTray = !!process.env.JAPRI_TRAY;
+
+export type Status = "connecting" | "qr" | "ready";
+
+/** Kabarin ikon tray (dibaca Japri.exe; baris ini gak ikut ke log). */
+export function reportStatus(status: Status) {
+  if (isTray) process.stdout.write(`@@japri-status ${status}\n`);
+}
 
 const QR_PAGE = path.join(DATA_DIR, "qr.html");
 const LOCK_FILE = path.join(DATA_DIR, "japri.lock");
@@ -66,9 +75,10 @@ export async function showQrInBrowser(qr: string) {
 /** Kalau halaman QR pernah dibuka, ganti isinya jadi "berhasil" (tetap auto-refresh sekali lagi lalu berhenti). */
 export function markConnected() {
   if (!qrOpened) return;
+  qrOpened = false; // kalau nanti perlu scan ulang, halamannya dibuka lagi
   fs.writeFileSync(
     QR_PAGE,
-    page(`<div class="ok">✅</div><h1>WhatsApp udah nyambung</h1><p>Halaman ini boleh ditutup. Balik ke jendela Japri ya.</p>`, false),
+    page(`<div class="ok">✅</div><h1>WhatsApp udah nyambung</h1><p>Halaman ini boleh ditutup.</p>`, false),
   );
 }
 

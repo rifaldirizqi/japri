@@ -11,7 +11,11 @@ Japri pakai **nomor WhatsApp kedua** yang lo invite ke grup-grup lo. Dia nyatet 
 | | Contoh |
 |---|---|
 | 🔔 **Notif mention** | Ada yang tag lo, bales pesan lo, atau nyebut nama panggilan lo di grup → bot langsung DM lo. Fitur ini gak pakai AI, jadi gratis. |
+| 📬 **"Gue ketinggalan apa?"** | Satu pesan berisi rangkuman **semua grup** sejak terakhir kali lo nimbrung, plus bagian _"Perlu perhatian lo"_. Gak perlu nyebut grup atau jam. |
+| 🗞️ **Digest harian** | _"kirim rangkuman tiap jam 9 malam"_ → tiap hari lo dapet rangkuman otomatis. Kalau gak ada obrolan baru, gak dikirim. |
 | 📝 **Rangkuman grup** | DM bot: _"rangkum grup kantor 3 jam terakhir"_. Atau di grup: _"@Japri rangkum 2 jam terakhir"_ |
+| 🔎 **Cari pesan lama** | _"siapa yang ngirim nomor rekening kemarin?"_ · _"kapan deadline proposal?"_ → dijawab lengkap sama grup, pengirim, dan jamnya |
+| 🔕 **Atur notif** | _"matiin notif grup alumni"_ · _"grup kantor cuma kalau di-tag"_ · _"jangan ganggu jam 10 malam sampai 6 pagi"_ (notif ditahan, dikirim jadi satu pesan pas pagi) |
 | ⏰ **Reminder** | _"ingetin gue besok jam 9 kirim laporan"_ · _"tiap senin jam 8 ingetin grup tim soal standup"_ |
 | ⚙️ **Atur lewat chat** | _"panggil gue andi atau ndi"_ · _"zona waktu gue WITA"_ · _"ganti nama lo jadi Jarvis"_ |
 | 🆕 **Kabar update** | Ada versi Japri baru → lo di-DM, lengkap sama isi perubahan dan cara update-nya. Bisa juga nanya _"ada update gak?"_ |
@@ -31,13 +35,21 @@ Cuma lo yang bisa merintah bot. Orang lain yang nge-DM atau nge-tag bot dicuekin
 1. Download **[JapriSetup.exe](https://github.com/rifaldirizqi/japri/releases/latest/download/JapriSetup.exe)** (atau dari [japri.rifaldirizqi.web.id](https://japri.rifaldirizqi.web.id)).
 2. Dobel-klik file itu. Kalau muncul layar biru _"Windows protected your PC"_, klik **More info** → **Run anyway**. Ini muncul karena installer-nya belum punya sertifikat tanda tangan digital, bukan karena virus.
 3. Klik **Next** sampai **Finish**. Gak perlu hak admin, dan gak perlu install apa-apa lagi.
-4. Jendela Japri kebuka otomatis. Ikutin langkahnya:
+4. Jendela setup Japri kebuka otomatis. Ikutin langkahnya:
    - Pilih provider AI, tempel API key (tekan Ctrl+V buat paste), pilih model.
    - Browser kebuka nampilin **QR**. Scan pakai **HP nomor bot**: WhatsApp → Perangkat tertaut → Tautkan perangkat.
    - Muncul **kode setup** 6 digit. Kirim kode itu dari **WhatsApp pribadi lo** ke nomor bot.
-5. Beres. **Jendela Japri boleh di-minimize, tapi jangan ditutup.** Kalau tadi opsi _"Jalankan otomatis"_ dicentang, Japri nyala sendiri tiap Windows nyala.
+5. Beres. Jendela setup ketutup sendiri, terus Japri jalan di **system tray**: ikon Japri di pojok kanan bawah, deket jam (kalau gak kelihatan, klik panah **^** di situ). Gak ada jendela yang bisa ketutup gak sengaja. Kalau tadi opsi _"Jalankan otomatis"_ dicentang, Japri nyala sendiri tiap Windows nyala.
 
-Di Start Menu ada juga **Japri - Ganti pengaturan AI** (ganti provider/API key) dan **Japri - Buka folder data** (buat backup).
+**Ikon tray Japri:**
+
+| Ikon | Artinya |
+|---|---|
+| Hijau | Jalan normal |
+| Abu-abu | Lagi nyambung ke WhatsApp |
+| Ada tanda **!** merah | Butuh perhatian: perlu scan QR ulang, atau error terus. Muncul juga notifikasi Windows. |
+
+Klik ikonnya buat buka menu: **Lihat log**, **Ganti pengaturan AI**, **Buka folder data**, dan **Keluar**. Kalau bot-nya crash, Japri nyalain ulang sendiri.
 
 ### Cara B — Docker
 
@@ -107,14 +119,14 @@ Daftar di atas per Oktober 2026. Model baru muncul terus, jadi kalau ragu, coba 
 
 ⚠️ **Model gratis:** provider-nya kadang nyimpen isi prompt, dan isi prompt Japri itu obrolan grup lo. Cek kebijakan data di halaman model, atau di Settings → Privacy di OpenRouter.
 
-**Kira-kira biaya:** notif mention gratis, karena gak pakai AI. Rangkuman 1 grup rame (~300 pesan) sekitar 10–20 ribu token. Pakai Claude Haiku 5.5 itu kira-kira Rp 30–50 per rangkuman. Kalau sehari 5 rangkuman, totalnya sekitar Rp 5 ribu sebulan.
+**Kira-kira biaya:** notif mention, atur notif, dan jam tenang gratis, karena gak pakai AI. Rangkuman 1 grup rame (~300 pesan) sekitar 10–20 ribu token. Pakai Claude Haiku 5.5 itu kira-kira Rp 30–50 per rangkuman. _"Gue ketinggalan apa?"_ dan digest harian dikirim ke AI sekali jalan buat semua grup (tiap grup maksimal 300 pesan terakhir): kalau ada 5 grup rame, kira-kira Rp 150–250 sekali rangkum. Digest tiap hari + 5 rangkuman sehari totalnya sekitar Rp 10–15 ribu sebulan. Cari pesan lama juga murah, karena yang dikirim ke AI cuma pesan yang cocok sama kata kuncinya.
 
 Mau ganti model? Bilang aja ke bot: _"ganti model ke claude-sonnet-5-5"_. Kalau mau ganti provider atau API key, jalanin setup lagi (lihat di bawah).
 
 ## Privasi
 
 - Semua data (pesan grup, reminder, pengaturan, session WhatsApp) disimpan di folder `data/` **di komputer lo sendiri**. Di versi installer Windows, letaknya di `%LOCALAPPDATA%\Japri\data`.
-- Isi grup cuma dikirim ke provider AI pas lo minta rangkuman atau ngasih perintah. Pesan yang masuk gak dikirim satu-satu.
+- Isi grup cuma dikirim ke provider AI pas lo minta rangkuman, nyari pesan, atau digest harian lo nyala. Pesan yang masuk gak dikirim satu-satu.
 - Pesan grup otomatis dihapus setelah 30 hari. Bisa diubah: _"simpan pesan 7 hari aja"_.
 - Pas masuk grup, bot ngenalin diri. **Admin grup** bisa ketik `@NamaBot keluar` atau kick bot, dan semua catatan grup itu langsung dihapus.
 - Folder `data/` isinya API key dan session WhatsApp. Jangan di-share atau di-upload ke mana-mana.
@@ -123,15 +135,15 @@ Mau ganti model? Bilang aja ke bot: _"ganti model ke claude-sonnet-5-5"_. Kalau 
 
 | Mau ngapain | Windows (installer) | Docker | Node |
 |---|---|---|---|
-| Lihat log | lihat jendela Japri | `docker compose logs -f` | lihat terminal / `pm2 logs` |
-| Ganti provider / API key | tutup jendela Japri → Start Menu → **Japri - Ganti pengaturan AI** | `docker compose run --rm japri setup` → `docker compose up -d` | `npm run setup` |
+| Lihat log | klik ikon Japri di tray → **Lihat log** | `docker compose logs -f` | lihat terminal / `pm2 logs` |
+| Ganti provider / API key | klik ikon Japri di tray → **Ganti pengaturan AI** | `docker compose run --rm japri setup` → `docker compose up -d` | `npm run setup` |
 | Update ke versi baru | download & jalanin installer versi baru (data tetap aman) | `git pull && docker compose up -d --build` | `git pull && npm install`, terus restart |
 | Matiin kabar update | bilang ke bot: _"matiin cek update"_ | sama | sama |
-| Berhentiin bot | tutup jendela Japri | `docker compose down` | Ctrl+C / `pm2 stop japri` |
-| Backup | Start Menu → **Japri - Buka folder data**, copy isinya | copy folder `data/` | copy folder `data/` |
+| Berhentiin bot | klik ikon Japri di tray → **Keluar** | `docker compose down` | Ctrl+C / `pm2 stop japri` |
+| Backup | klik ikon Japri di tray → **Buka folder data**, copy isinya | copy folder `data/` | copy folder `data/` |
 | Uninstall | lihat [Uninstall](#uninstall) | `docker compose down`, hapus folder | hapus folder |
 
-Kalau setup di-rerun pas bot lagi nyala, matiin dulu botnya, biar gak ada dua bot di satu nomor. Versi Windows otomatis nolak jalan dobel.
+Docker/Node: kalau setup di-rerun pas bot lagi nyala, matiin dulu botnya, biar gak ada dua bot di satu nomor. Versi Windows ngurus ini sendiri: Japri dimatiin dulu selama setup, terus dinyalain lagi.
 
 ## Uninstall
 
@@ -153,12 +165,13 @@ Shortcut di Desktop, Start Menu, dan autostart ikut kehapus otomatis.
 
 ## Troubleshooting
 
-- **"Bot di-logout dari WhatsApp"**: hapus folder `data/auth`, jalanin setup lagi, scan QR ulang.
+- **"Bot di-logout dari WhatsApp"**: di Windows, Japri otomatis buka halaman QR baru di browser dan ikonnya ada tanda **!**: tinggal scan ulang pakai HP nomor bot. Di Docker/Node: hapus folder `data/auth`, jalanin setup lagi, scan QR ulang.
 - **QR gak muncul / koneksi putus terus**: cek internet. Kalau di jaringan kantor yang pakai proxy, set env `HTTPS_PROXY`.
 - **Bot gak bales**: pastiin lo ngirim dari nomor yang dulu ngirim kode setup. Cek log buat lihat error dari provider AI (API key salah, saldo habis, dll).
 - **Ollama dari Docker gak nyambung**: pakai alamat `http://host.docker.internal:11434/v1` (default wizard udah gitu). Pastiin Ollama dengerin di semua alamat: `OLLAMA_HOST=0.0.0.0`.
 - **Reminder telat**: kalau komputer sempat mati, reminder yang kelewat tetap dikirim pas nyala lagi, dan ditandai telat.
-- **Windows: jendela Japri ketutup terus bot mati**: buka lagi dari ikon Japri. Biar gak ketutup gak sengaja, minimize aja jendelanya.
+- **Windows: ikon Japri gak kelihatan**: klik panah **^** di pojok kanan bawah. Biar selalu kelihatan, geser ikon Japri ke taskbar. Kalau gak ada juga, berarti Japri gak jalan: buka dari Start Menu.
+- **Windows: ikon ada tanda ! merah**: arahin mouse ke ikonnya buat lihat masalahnya. Kalau _"Berhenti karena error"_, klik ikon → **Lihat log** buat detailnya, terus **Coba jalanin lagi**.
 - **Windows: QR gak kebuka di browser**: buka manual file `qr.html` di folder data (Start Menu → Japri - Buka folder data).
 - **Windows: PC sleep**: bot gak jalan selama PC sleep. Atur di Settings → System → Power → Sleep: _Never_ kalau mau Japri nyala terus.
 
@@ -174,7 +187,10 @@ Bot ini pakai [Baileys](https://github.com/WhiskeySockets/Baileys), library yang
 src/
   main.ts                 entry point: wizard → koneksi WA → scheduler
   bot.ts                  routing pesan: klaim owner, notif mention, perintah, keluar grup
-  scheduler.ts            kirim reminder, hapus pesan lama
+  catchup.ts              "gue ketinggalan apa?": titik mulai per grup + transkrip semua grup
+  digest.ts               digest harian (termasuk yang telat karena PC mati)
+  notify.ts               kirim ke owner + jam tenang (notif ditahan, dikirim gabungan)
+  scheduler.ts            kirim reminder, digest, notif yang ditahan, hapus pesan lama
   agent/agent.ts          prompt + riwayat obrolan
   agent/tools.ts          tools yang bisa dipanggil AI (provider-agnostik, pakai zod)
   llm/types.ts            interface LLM & Tool
@@ -182,15 +198,15 @@ src/
   llm/openai-compatible.ts adapter OpenAI / Gemini / OpenRouter / Ollama / LM Studio
   wa/client.ts            koneksi Baileys & parsing pesan
   setup/wizard.ts         wizard di terminal
-  desktop.ts              mode desktop Windows: QR di browser, cegah jalan dobel
+  desktop.ts              mode desktop Windows: QR di browser, cegah jalan dobel, status buat ikon tray
   updater.ts              cek rilis baru di GitHub, kabarin owner
   config.ts · db.ts · time.ts
 site/                     landing page japri.rifaldirizqi.web.id (deploy ke VPS: docs/DEPLOY-LANDING.md)
 deploy/landing/           script setup VPS + konfigurasi Caddy buat landing page
-packaging/windows/        installer Windows: launcher Japri.exe (Go), script Inno Setup, build.ps1
+packaging/windows/        installer Windows: Japri.exe (Go, system tray + jendela setup), script Inno Setup, build.ps1
 .github/workflows/        build installer Windows otomatis tiap push tag v*
 test/                     tes routing bot & adapter AI (WhatsApp & AI di-mock)
-docs/REQUIREMENTS.md      requirement & scope
+docs/REQUIREMENTS*.md     requirement & scope tiap versi
 ```
 
 - **Nambah kemampuan:** tambah satu `defineTool({...})` di `src/agent/tools.ts`. Otomatis jalan di semua provider.
