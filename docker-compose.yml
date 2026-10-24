@@ -1,0 +1,11 @@
+services:
+  japri:
+    build: .
+    image: japri
+    restart: unless-stopped
+    stdin_open: true   # buat wizard setup
+    tty: true
+    volumes:
+      - ./data:/data   # session WA, database, & pengaturan
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # biar bisa akses Ollama/LM Studio di PC yang sama

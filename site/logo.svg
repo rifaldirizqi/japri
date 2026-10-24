@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Japri">
+  <rect x="40" y="40" width="944" height="944" rx="220" fill="#107A5C"/>
+  <rect x="190" y="200" width="644" height="524" rx="170" fill="#fff"/>
+  <path d="M300 694 L260 854 L450 714 Z" fill="#fff"/>
+  <text x="512" y="462" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="400" fill="#107A5C">J</text>
+  <circle cx="794" cy="220" r="100" fill="#FF9800" stroke="#107A5C" stroke-width="28"/>
+</svg>

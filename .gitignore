@@ -1,0 +1,20 @@
+node_modules
+dist
+data
+.env
+packaging/windows/launcher/*.syso
+
+# Rahasia & data pribadi: jangan pernah di-commit (lihat CLAUDE.md)
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*-deploy
+*-deploy.pub
+*.db
+*.sqlite
+*.dump
+*.sql.gz
+backups/

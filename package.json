@@ -1,0 +1,41 @@
+{
+  "name": "japri",
+  "version": "0.1.0",
+  "description": "Japri — asisten pribadi self-hosted buat grup WhatsApp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rifaldirizqi/japri"
+  },
+  "homepage": "https://japri.rifaldirizqi.web.id",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "setup": "tsx src/main.ts setup",
+    "test": "node --import tsx --experimental-test-module-mocks --test test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "author": "",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@hapi/boom": "^10.0.1",
+    "@inquirer/prompts": "^8.7.4",
+    "baileys": "7.0.0-rc14",
+    "https-proxy-agent": "^9.1.0",
+    "openai": "^7.43.0",
+    "pino": "^10.4.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/qrcode": "^1.5.6",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^7.0.2"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT"
+}
