@@ -5,7 +5,7 @@ dan ringkasannya dikirim ke owner lewat WhatsApp waktu ada update.
 
 Format tiap versi: `## [x.y.z] - YYYY-MM-DD`, terus daftar poin (`- ...`) pakai bahasa yang dimengerti user awam.
 
-## [0.2.0] - 2026-10-24
+## [0.2.0] - 2026-10-25
 
 - _"Gue ketinggalan apa?"_: satu pesan berisi rangkuman semua grup sejak terakhir lo nimbrung, plus bagian "Perlu perhatian lo"
 - Digest harian: _"kirim rangkuman tiap jam 9 malam"_. Kalau gak ada obrolan baru, gak dikirim
