@@ -72,7 +72,7 @@ Di v0.1.0, Japri jalan di jendela hitam yang gak boleh ditutup. Buat user awam i
 | F5.6 | **Setup pertama** (wizard, API key, scan QR, kode setup) tetap pakai jendela console kayak sekarang, karena butuh tempat ngetik. Abis setup selesai, jendela console ketutup sendiri dan jendela Japri kebuka. |
 | F5.7 | Kalau WhatsApp minta scan QR ulang: notifikasi Windows, halaman QR kebuka di browser, dan di jendela Japri muncul tombol **Buka halaman QR**. |
 | F5.8 | Kalau bot-nya crash, Japri nyoba nyalain ulang sendiri. Kalau gagal terus (3× dalam 5 menit), status jadi "butuh perhatian", plus notifikasi Windows dan tombol **Coba jalanin lagi**. |
-| F5.9 | Japri cuma berhenti kalau dipilih **Keluar** (tombol di jendela atau menu tray), atau pas Windows dimatiin. |
+| F5.9 | Japri cuma berhenti kalau dipilih **Keluar** (tombol di jendela atau menu tray), atau pas Windows dimatiin. Sebelum berhenti, Japri **nanya dulu**: ngingetin bot bakal mati (gak ada notif, rangkuman, digest, reminder) dan nyaranin tombol X kalau cuma mau nutup jendela. Pilihan default-nya "No". |
 | F5.10 | Tetap cuma satu Japri yang jalan. Kalau dibuka lagi pas udah jalan, jendela Japri yang udah ada dimunculin. |
 | F5.11 | Docker & Node.js gak berubah. Fitur ini khusus installer Windows. |
 

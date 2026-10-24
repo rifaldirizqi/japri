@@ -330,7 +330,11 @@ func (t *tray) showMenu() {
 		shellOpen(t.paths.data, "")
 	case menuQR:
 		shellOpen(t.paths.qr, "")
-	case menuSetup, menuRetry, menuQuit:
+	case menuQuit:
+		if confirmQuit(0) {
+			t.onCmd(menuQuit)
+		}
+	case menuSetup, menuRetry:
 		t.onCmd(int(cmd))
 	}
 }

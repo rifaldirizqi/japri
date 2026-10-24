@@ -41,7 +41,7 @@ Cuma lo yang bisa merintah bot. Orang lain yang nge-DM atau nge-tag bot dicuekin
    - Muncul **kode setup** 6 digit. Kirim kode itu dari **WhatsApp pribadi lo** ke nomor bot.
 5. Beres. Jendela setup ketutup sendiri, terus **jendela Japri** kebuka: isinya status, nomor bot, model AI, tombol-tombol, dan log.
 
-**Jendela Japri boleh ditutup kapan aja.** Tombol X atau minimize cuma nyembunyiin jendelanya ke **system tray** (ikon Japri di pojok kanan bawah, deket jam; kalau gak kelihatan, klik panah **^** di situ). Bot-nya tetap jalan. Buat buka lagi, klik ikon itu atau buka Japri dari Desktop / Start Menu. Japri cuma berhenti kalau lo klik **Keluar**.
+**Jendela Japri boleh ditutup kapan aja.** Tombol X atau minimize cuma nyembunyiin jendelanya ke **system tray** (ikon Japri di pojok kanan bawah, deket jam; kalau gak kelihatan, klik panah **^** di situ). Bot-nya tetap jalan. Buat buka lagi, klik ikon itu atau buka Japri dari Desktop / Start Menu. Japri cuma berhenti kalau lo klik **Keluar**, dan itu pun ditanya dulu biar gak kepencet.
 
 Kalau tadi opsi _"Jalankan otomatis"_ dicentang, Japri nyala sendiri tiap Windows nyala, langsung ke tray tanpa buka jendela.
 

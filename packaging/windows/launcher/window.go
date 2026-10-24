@@ -319,7 +319,9 @@ func mainProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 		case idBtnRetry:
 			w.t.onCmd(menuRetry)
 		case idBtnQuit:
-			w.t.onCmd(menuQuit)
+			if confirmQuit(w.hwnd) {
+				w.t.onCmd(menuQuit)
+			}
 		}
 		return 0
 	case wmSysCommand:

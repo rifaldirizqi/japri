@@ -138,8 +138,13 @@ const (
 	logPixelsY      = 90
 	idcArrow        = 32512
 
-	mbOK          = 0x00000000
-	mbIconWarning = 0x00000030
+	mbOK            = 0x00000000
+	mbYesNo         = 0x00000004
+	mbIconWarning   = 0x00000030
+	mbDefButton2    = 0x00000100
+	mbSetForeground = 0x00010000
+	mbTopmost       = 0x00040000
+	idYes           = 6
 )
 
 type wndClassEx struct {
@@ -210,6 +215,17 @@ func shellOpen(file string, args string) {
 	}
 	procShellExecuteW.Call(0, uintptr(unsafe.Pointer(utf16Ptr("open"))), uintptr(unsafe.Pointer(utf16Ptr(file))),
 		uintptr(unsafe.Pointer(params)), 0, 1)
+}
+
+// confirmQuit: tanya dulu sebelum Japri dimatiin (default-nya "No").
+func confirmQuit(owner uintptr) bool {
+	text := "Kalau Japri dimatiin, bot WhatsApp-nya ikut berhenti: gak ada notif mention, rangkuman, " +
+		"digest, atau reminder sampai Japri dibuka lagi.\n\n" +
+		"Cuma mau nutup jendela? Pakai tombol X aja, Japri tetap jalan di system tray.\n\n" +
+		"Tetap matiin Japri?"
+	r, _, _ := procMessageBoxW.Call(owner, uintptr(unsafe.Pointer(utf16Ptr(text))), uintptr(unsafe.Pointer(utf16Ptr("Matiin Japri?"))),
+		mbYesNo|mbIconWarning|mbDefButton2|mbSetForeground|mbTopmost)
+	return r == idYes
 }
 
 func messageBox(title, text string) {
