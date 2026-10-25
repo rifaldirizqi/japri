@@ -10,15 +10,17 @@ Japri pakai **nomor WhatsApp kedua** yang lo invite ke grup-grup lo. Dia nyatet 
 
 | | Contoh |
 |---|---|
-| 🔔 **Notif mention** | Ada yang tag lo, bales pesan lo, atau nyebut nama panggilan lo di grup → bot langsung DM lo. Fitur ini gak pakai AI, jadi gratis. |
+| 🔔 **Notif mention** | Ada yang tag lo, bales pesan lo, atau nyebut nama panggilan lo di grup → bot langsung DM lo. |
+| 📌 **Tugas → reminder** | Notif yang isinya tugas (_"Ndi, kirim laporan Jumat ya"_) ditambahin _"Mau gue ingetin Jum 09:00?"_. Bales *ya*, atau sebut jam lain. |
 | 📬 **"Gue ketinggalan apa?"** | Satu pesan berisi rangkuman **semua grup** sejak terakhir kali lo nimbrung, plus bagian _"Perlu perhatian lo"_. Gak perlu nyebut grup atau jam. |
-| 🗞️ **Digest harian** | _"kirim rangkuman tiap jam 9 malam"_ → tiap hari lo dapet rangkuman otomatis. Kalau gak ada obrolan baru, gak dikirim. |
+| 🗞️ **Digest harian & mingguan** | _"kirim rangkuman tiap jam 9 malam"_ · _"tiap hari kerja aja"_ · _"rangkuman mingguan tiap Minggu jam 7 malam"_. Kalau gak ada obrolan baru, gak dikirim. |
 | 📝 **Rangkuman grup** | DM bot: _"rangkum grup kantor 3 jam terakhir"_. Atau di grup: _"@Japri rangkum 2 jam terakhir"_ |
 | 🔎 **Cari pesan lama** | _"siapa yang ngirim nomor rekening kemarin?"_ · _"kapan deadline proposal?"_ → dijawab lengkap sama grup, pengirim, dan jamnya |
+| 🖼️ **Baca gambar** | _"baca gambar di semua grup"_ → poster, jadwal, dan struk dibaca AI, terus ikut masuk rangkuman & pencarian. Default mati. Kirim gambar langsung ke bot juga bisa: _"ingetin gue acara ini"_ |
 | 🔕 **Atur notif** | _"matiin notif grup alumni"_ · _"grup kantor cuma kalau di-tag"_ · _"jangan ganggu jam 10 malam sampai 6 pagi"_ (notif ditahan, dikirim jadi satu pesan pas pagi) |
 | ⏰ **Reminder** | _"ingetin gue besok jam 9 kirim laporan"_ · _"tiap senin jam 8 ingetin grup tim soal standup"_ |
 | ⚙️ **Atur lewat chat** | _"panggil gue andi atau ndi"_ · _"zona waktu gue WITA"_ · _"ganti nama lo jadi Jarvis"_ |
-| 🆕 **Kabar update** | Ada versi Japri baru → lo di-DM, lengkap sama isi perubahan dan cara update-nya. Bisa juga nanya _"ada update gak?"_ |
+| 🆕 **Kabar update** | Ada versi Japri baru → lo di-DM, lengkap sama isi perubahan. Di Windows, bales *update* dan Japri update sendiri. Bisa juga nanya _"ada update gak?"_ |
 
 Cuma lo yang bisa merintah bot. Orang lain yang nge-DM atau nge-tag bot dicuekin.
 
@@ -60,10 +62,12 @@ Kalau bot-nya crash, Japri nyalain ulang sendiri. Klik kanan ikon tray buat menu
 Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) atau Docker Engine (Linux), terus:
 
 ```bash
-git clone <url-repo-ini> japri
-cd japri
+mkdir japri && cd japri
+curl -fsSLO https://raw.githubusercontent.com/rifaldirizqi/japri/main/docker-compose.yml
 docker compose run --rm japri setup
 ```
+
+Image-nya udah jadi (`ghcr.io/rifaldirizqi/japri`), jadi gak perlu build sendiri. Jalan di PC/VPS biasa maupun Raspberry Pi / VPS ARM.
 
 Wizard bakal nuntun lo:
 1. Pilih provider AI, tempel API key, pilih model. Wizard ngetes koneksinya dulu.
@@ -123,14 +127,15 @@ Daftar di atas per Oktober 2026. Model baru muncul terus, jadi kalau ragu, coba 
 
 ⚠️ **Model gratis:** provider-nya kadang nyimpen isi prompt, dan isi prompt Japri itu obrolan grup lo. Cek kebijakan data di halaman model, atau di Settings → Privacy di OpenRouter.
 
-**Kira-kira biaya:** notif mention, atur notif, dan jam tenang gratis, karena gak pakai AI. Rangkuman 1 grup rame (~300 pesan) sekitar 10–20 ribu token. Pakai Claude Haiku 5.5 itu kira-kira Rp 30–50 per rangkuman. _"Gue ketinggalan apa?"_ dan digest harian dikirim ke AI sekali jalan buat semua grup (tiap grup maksimal 300 pesan terakhir): kalau ada 5 grup rame, kira-kira Rp 150–250 sekali rangkum. Digest tiap hari + 5 rangkuman sehari totalnya sekitar Rp 10–15 ribu sebulan. Cari pesan lama juga murah, karena yang dikirim ke AI cuma pesan yang cocok sama kata kuncinya.
+**Kira-kira biaya:** notif mention, atur notif, dan jam tenang gratis, karena gak pakai AI. Saran reminder dari tugas (_bisa dimatiin: "matiin saran reminder"_) ngecek tiap pesan yang bikin notif ke lo, kira-kira Rp 1 per pesan. Rangkuman 1 grup rame (~300 pesan) sekitar 10–20 ribu token. Pakai Claude Haiku 5.5 itu kira-kira Rp 30–50 per rangkuman. _"Gue ketinggalan apa?"_ dan digest harian dikirim ke AI sekali jalan buat semua grup (tiap grup maksimal 300 pesan terakhir): kalau ada 5 grup rame, kira-kira Rp 150–250 sekali rangkum. Digest tiap hari + 5 rangkuman sehari totalnya sekitar Rp 10–15 ribu sebulan. Cari pesan lama juga murah, karena yang dikirim ke AI cuma pesan yang cocok sama kata kuncinya. Digest mingguan sekitar Rp 150–300 sekali kirim. Baca gambar sekitar Rp 3–5 per gambar, maksimal 100 gambar sehari.
 
 Mau ganti model? Bilang aja ke bot: _"ganti model ke claude-sonnet-5-5"_. Kalau mau ganti provider atau API key, jalanin setup lagi (lihat di bawah).
 
 ## Privasi
 
 - Semua data (pesan grup, reminder, pengaturan, session WhatsApp) disimpan di folder `data/` **di komputer lo sendiri**. Di versi installer Windows, letaknya di `%LOCALAPPDATA%\Japri\data`.
-- Isi grup cuma dikirim ke provider AI pas lo minta rangkuman, nyari pesan, atau digest harian lo nyala. Pesan yang masuk gak dikirim satu-satu.
+- Isi grup cuma dikirim ke provider AI pas lo minta rangkuman, nyari pesan, atau digest lo nyala. Selain itu, pesan yang ditujuin ke lo (tag, reply, nama panggilan) dikirim satu-satu buat dicek isinya tugas atau bukan; bisa dimatiin pakai _"matiin saran reminder"_.
+- **Gambar** cuma dikirim ke AI kalau lo nyalain fitur baca gambar. File gambarnya gak disimpan, cuma catatan teksnya.
 - Pesan grup otomatis dihapus setelah 30 hari. Bisa diubah: _"simpan pesan 7 hari aja"_.
 - Pas masuk grup, bot ngenalin diri. **Admin grup** bisa ketik `@NamaBot keluar` atau kick bot, dan semua catatan grup itu langsung dihapus.
 - Folder `data/` isinya API key dan session WhatsApp. Jangan di-share atau di-upload ke mana-mana.
@@ -141,7 +146,7 @@ Mau ganti model? Bilang aja ke bot: _"ganti model ke claude-sonnet-5-5"_. Kalau 
 |---|---|---|---|
 | Lihat log | buka jendela Japri (log ada di bawah). Log lengkap: file `japri.log` di folder data | `docker compose logs -f` | lihat terminal / `pm2 logs` |
 | Ganti provider / API key | jendela Japri → **Ganti pengaturan AI** | `docker compose run --rm japri setup` → `docker compose up -d` | `npm run setup` |
-| Update ke versi baru | download & jalanin installer versi baru (data tetap aman) | `git pull && docker compose up -d --build` | `git pull && npm install`, terus restart |
+| Update ke versi baru | bales *update* ke kabar versi baru dari Japri (atau jalanin installer versi baru; data tetap aman) | `docker compose pull && docker compose up -d` | `git pull && npm install`, terus restart |
 | Matiin kabar update | bilang ke bot: _"matiin cek update"_ | sama | sama |
 | Berhentiin bot | jendela Japri → **Keluar** (nutup jendela doang gak matiin bot) | `docker compose down` | Ctrl+C / `pm2 stop japri` |
 | Backup | jendela Japri → **Buka folder data**, copy isinya | copy folder `data/` | copy folder `data/` |
@@ -192,8 +197,11 @@ src/
   main.ts                 entry point: wizard → koneksi WA → scheduler
   bot.ts                  routing pesan: klaim owner, notif mention, perintah, keluar grup
   catchup.ts              "gue ketinggalan apa?": titik mulai per grup + transkrip semua grup
-  digest.ts               digest harian (termasuk yang telat karena PC mati)
+  digest.ts               digest harian (tiap hari / hari kerja) & mingguan, termasuk yang telat karena PC mati
   notify.ts               kirim ke owner + jam tenang (notif ditahan, dikirim gabungan)
+  tasks.ts                tugas di notif mention → tawaran reminder ("ya" / jam lain)
+  vision.ts               baca gambar jadi catatan teks (jatah harian, cek model bisa lihat gambar)
+  selfupdate.ts           update sekali klik di Windows: download, cek checksum, pasang tanpa jendela
   scheduler.ts            kirim reminder, digest, notif yang ditahan, hapus pesan lama
   agent/agent.ts          prompt + riwayat obrolan
   agent/tools.ts          tools yang bisa dipanggil AI (provider-agnostik, pakai zod)
@@ -208,7 +216,7 @@ src/
 site/                     landing page japri.rifaldirizqi.web.id (deploy ke VPS: docs/DEPLOY-LANDING.md)
 deploy/landing/           script setup VPS + konfigurasi Caddy buat landing page
 packaging/windows/        installer Windows: Japri.exe (Go, system tray + jendela setup), script Inno Setup, build.ps1
-.github/workflows/        build installer Windows otomatis tiap push tag v*
+.github/workflows/        tiap push tag v*: installer Windows + image Docker (ghcr.io, amd64 & arm64)
 test/                     tes routing bot & adapter AI (WhatsApp & AI di-mock)
 docs/REQUIREMENTS*.md     requirement & scope tiap versi
 ```

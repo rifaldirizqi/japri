@@ -10,8 +10,10 @@ export type Tool<S extends z.ZodObject = z.ZodObject> = {
 
 export const defineTool = <S extends z.ZodObject>(tool: Tool<S>): Tool => tool as unknown as Tool;
 
-/** Riwayat percakapan disimpan sebagai teks saja, supaya bisa pindah provider kapan aja. */
-export type Turn = { role: "user" | "assistant"; text: string };
+export type Image = { mediaType: string; /** base64 */ data: string };
+
+/** Riwayat percakapan disimpan sebagai teks saja, supaya bisa pindah provider kapan aja. Gambar cuma buat giliran yang lagi jalan. */
+export type Turn = { role: "user" | "assistant"; text: string; images?: Image[] };
 
 export type RunOptions = {
   system: string;

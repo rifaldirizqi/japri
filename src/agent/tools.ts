@@ -4,7 +4,13 @@ import * as store from "../db.js";
 import { defineTool, testToolCalling } from "../llm/index.js";
 import { reportInfo } from "../desktop.js";
 import { catchupPrompt, collectCatchup, commitCatchup, transcript } from "../catchup.js";
-import { formatMinutes, formatTs, isValidTimezone, lastOccurrence, nowTs, parseHM } from "../time.js";
+import { acceptOffer } from "../tasks.js";
+import { DAY_NAMES, digestHandledNow } from "../digest.js";
+import { MAX_IMAGES_PER_DAY, readsImages, testVision } from "../vision.js";
+import { installUpdate } from "../selfupdate.js";
+import { ownerJid } from "../notify.js";
+import { sendText } from "../wa/client.js";
+import { formatMinutes, formatTs, isValidTimezone, nowTs, parseHM } from "../time.js";
 import { checkForUpdate, currentVersion, updateMessage } from "../updater.js";
 
 function resolveGroup(query: string, current?: store.Chat): store.Chat | string {
@@ -130,6 +136,28 @@ export function buildTools(current?: store.Chat) {
     }),
 
     defineTool({
+      name: "accept_reminder_offer",
+      description: "Terima tawaran reminder (📌) dari notif mention: bikin reminder ke DM owner. Isi due_at kalau owner minta jam lain.",
+      input: z.object({
+        id: z.number().int().describe("ID tawaran, dari daftar tawaran yang belum dijawab"),
+        due_at: z.string().optional().describe("Jam lain yang owner minta, ISO 8601 dengan offset"),
+      }),
+      run: async ({ id, due_at }) => {
+        const offer = store.getOffer(id);
+        if (!offer) return `Tawaran #${id} gak ditemukan.`;
+        if (!offer.open) return `Tawaran #${id} udah dijawab sebelumnya.`;
+        let dueTs = offer.due_ts;
+        if (due_at) {
+          const due = Date.parse(due_at);
+          if (Number.isNaN(due)) return `Format waktu gak valid: ${due_at}`;
+          dueTs = Math.floor(due / 1000);
+          if (dueTs < nowTs() - 60) return `Waktu ${due_at} sudah lewat.`;
+        }
+        return acceptOffer(offer, dueTs);
+      },
+    }),
+
+    defineTool({
       name: "list_reminders",
       description: "Daftar reminder yang masih aktif.",
       input: z.object({}),
@@ -166,7 +194,14 @@ export function buildTools(current?: store.Chat) {
           `AI: ${c.llm.provider} / ${c.llm.model}`,
           `Versi Japri: v${currentVersion}`,
           `Cek update otomatis: ${c.checkUpdates ? "nyala" : "mati"}`,
-          `Digest harian: ${c.digest ? `tiap jam ${c.digest.time}` : "mati"}`,
+          `Saran reminder dari tugas di grup: ${c.taskOffers ? "nyala" : "mati"}`,
+          `Baca gambar di grup: ${c.readImages ? "nyala" : "mati"} (umum)` +
+            (() => {
+              const custom = store.listGroups().filter((g) => g.read_images != null);
+              return custom.length ? `; khusus: ${custom.map((g) => `${g.name} ${g.read_images ? "nyala" : "mati"}`).join(", ")}` : "";
+            })(),
+          `Digest harian: ${c.digest ? `${c.digest.weekdaysOnly ? "Senin–Jumat" : "tiap hari"} jam ${c.digest.time}` : "mati"}`,
+          `Digest mingguan: ${c.weeklyDigest ? `tiap ${DAY_NAMES[c.weeklyDigest.day]} jam ${c.weeklyDigest.time}` : "mati"}`,
           `Jam tenang: ${c.quietHours ? `${c.quietHours.start}–${c.quietHours.end}` : "mati"}`,
         ].join("\n");
       },
@@ -182,6 +217,7 @@ export function buildTools(current?: store.Chat) {
         retention_days: z.number().int().min(1).max(365).optional(),
         model: z.string().optional().describe("Nama model lain dari provider yang sama"),
         check_updates: z.boolean().optional().describe("Nyalain/matiin kabar otomatis kalau ada versi Japri baru"),
+        task_offers: z.boolean().optional().describe("Nyalain/matiin saran reminder (📌) di notif mention yang isinya tugas"),
       }),
       run: async (input) => {
         const c = loadConfig();
@@ -207,6 +243,10 @@ export function buildTools(current?: store.Chat) {
           updateConfig({ checkUpdates: input.check_updates });
           changes.push(`cek update otomatis (${input.check_updates ? "nyala" : "mati"})`);
         }
+        if (input.task_offers !== undefined) {
+          updateConfig({ taskOffers: input.task_offers });
+          changes.push(`saran reminder (${input.task_offers ? "nyala" : "mati"})`);
+        }
         if (input.model && input.model !== c.llm.model) {
           const candidate = { ...c.llm, model: input.model };
           const test = await testToolCalling(candidate);
@@ -216,6 +256,20 @@ export function buildTools(current?: store.Chat) {
           changes.push(`model (sekarang ${input.model})`);
         }
         return changes.length ? `Disimpan: ${changes.join(", ")}.` : "Gak ada yang diubah.";
+      },
+    }),
+
+    defineTool({
+      name: "install_update",
+      description:
+        "Update Japri ke versi terbaru sekarang. Cuma panggil kalau owner jelas minta update/pasang versi baru. Di installer Windows, Japri download & pasang sendiri lalu nyala lagi; di Docker/Node, hasilnya instruksi update manual. Sampaikan hasilnya apa adanya.",
+      input: z.object({}),
+      run: async () => {
+        const to = ownerJid();
+        const result = await installUpdate(async (t) => {
+          if (to) await sendText(to, t);
+        });
+        return result ?? "Installer udah jalan. Bilang ke owner Japri bakal offline bentar dan ngabarin lagi pas udah nyala.";
       },
     }),
 
@@ -233,20 +287,44 @@ export function buildTools(current?: store.Chat) {
   
     defineTool({
       name: "set_digest",
-      description: "Nyalain, ubah jam, atau matiin digest harian (rangkuman semua grup yang dikirim otomatis tiap hari ke DM owner).",
+      description:
+        "Nyalain, ubah jam, atau matiin digest harian (rangkuman semua grup yang dikirim otomatis ke DM owner). Bisa tiap hari atau hari kerja aja (Senin–Jumat).",
       input: z.object({
         time: hmInput("Jam kirim").nullable().describe("Jam kirim format 24 jam HH:MM (mis. 21:00), atau null buat matiin"),
+        weekdays_only: z.boolean().default(false).describe("true = cuma Senin–Jumat"),
       }),
-      run: async ({ time }) => {
+      run: async ({ time, weekdays_only }) => {
         if (time === null) {
           updateConfig({ digest: null });
           return "Digest harian dimatiin.";
         }
         const minutes = parseHM(time);
         if (minutes === null) return `Jam "${time}" gak valid. Pakai format HH:MM.`;
-        // Jadwal yang udah lewat hari ini gak dikirim mendadak; mulai dari jadwal berikutnya
-        updateConfig({ digest: { time: formatMinutes(minutes) }, digestHandledTs: lastOccurrence(minutes, nowTs(), tz) });
-        return `Digest harian nyala: tiap jam ${formatMinutes(minutes)}. Kalau gak ada obrolan baru, gak dikirim.`;
+        updateConfig({ digest: { time: formatMinutes(minutes), weekdaysOnly: weekdays_only } });
+        // Jadwal yang udah lewat gak dikirim mendadak; mulai dari jadwal berikutnya
+        updateConfig({ digestHandledTs: digestHandledNow("daily", loadConfig(), nowTs()) });
+        return `Digest harian nyala: ${weekdays_only ? "Senin–Jumat" : "tiap hari"} jam ${formatMinutes(minutes)}. Kalau gak ada obrolan baru, gak dikirim.`;
+      },
+    }),
+
+    defineTool({
+      name: "set_weekly_digest",
+      description: "Nyalain, ubah jadwal, atau matiin digest mingguan: gambaran besar 7 hari terakhir semua grup, dikirim seminggu sekali ke DM owner.",
+      input: z.object({
+        day: z.enum(["minggu", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu"]).nullable().describe("Hari kirim, atau null buat matiin"),
+        time: hmInput("Jam kirim").default("19:00"),
+      }),
+      run: async ({ day, time }) => {
+        if (day === null) {
+          updateConfig({ weeklyDigest: null });
+          return "Digest mingguan dimatiin.";
+        }
+        const minutes = parseHM(time);
+        if (minutes === null) return `Jam "${time}" gak valid. Pakai format HH:MM.`;
+        const dayIndex = DAY_NAMES.findIndex((d) => d.toLowerCase() === day);
+        updateConfig({ weeklyDigest: { day: dayIndex, time: formatMinutes(minutes) } });
+        updateConfig({ weeklyHandledTs: digestHandledNow("weekly", loadConfig(), nowTs()) });
+        return `Digest mingguan nyala: tiap ${DAY_NAMES[dayIndex]} jam ${formatMinutes(minutes)}.`;
       },
     }),
 
@@ -288,6 +366,35 @@ export function buildTools(current?: store.Chat) {
     }),
 
     defineTool({
+      name: "set_image_reading",
+      description: `Nyalain/matiin baca gambar di grup: gambar (poster, jadwal, struk) dibaca AI jadi catatan teks buat rangkuman & pencarian. Gambar dikirim ke penyedia AI, jadi cuma nyalain kalau owner minta. Maks ${MAX_IMAGES_PER_DAY} gambar/hari. Tanpa group = berlaku buat semua grup.`,
+      input: z.object({
+        enabled: z.boolean(),
+        group: z.string().optional().describe("Nama grup kalau cuma buat satu grup; kosongin buat semua grup"),
+      }),
+      run: async ({ enabled, group }) => {
+        let g: store.Chat | undefined;
+        if (group) {
+          const found = resolveGroup(group, current);
+          if (typeof found === "string") return found;
+          g = found;
+        }
+        const alreadyOn = store.listGroups().some((x) => readsImages(x)) || loadConfig().readImages;
+        if (enabled && !alreadyOn) {
+          const test = await testVision(loadConfig().llm);
+          if (!test.ok) return `Model AI yang sekarang (${loadConfig().llm.model}) gak bisa baca gambar: ${test.detail}. Sarankan owner ganti ke model yang bisa baca gambar (mis. Claude, GPT-4o/5, Gemini). Pengaturan gak diubah.`;
+        }
+        if (g) {
+          store.setReadImages(g.jid, enabled ? 1 : 0);
+          return `Baca gambar di "${g.name}": ${enabled ? "nyala" : "mati"}.`;
+        }
+        updateConfig({ readImages: enabled });
+        for (const x of store.listGroups()) store.setReadImages(x.jid, null); // ikut pengaturan umum
+        return `Baca gambar di semua grup: ${enabled ? `nyala (maks ${MAX_IMAGES_PER_DAY} gambar/hari; stiker & foto sekali lihat dilewati)` : "mati"}.`;
+      },
+    }),
+
+    defineTool({
       name: "get_notification_settings",
       description: "Lihat pengaturan notif: mode notif tiap grup, nama panggilan, jam tenang, dan digest harian.",
       input: z.object({}),
@@ -297,7 +404,8 @@ export function buildTools(current?: store.Chat) {
         return [
           `Nama panggilan (buat notif): ${c.nicknames.join(", ") || "(belum diatur)"}`,
           `Jam tenang: ${c.quietHours ? `${c.quietHours.start}–${c.quietHours.end}` : "mati"}`,
-          `Digest harian: ${c.digest ? `tiap jam ${c.digest.time}` : "mati"}`,
+          `Digest harian: ${c.digest ? `${c.digest.weekdaysOnly ? "Senin–Jumat" : "tiap hari"} jam ${c.digest.time}` : "mati"}`,
+          `Digest mingguan: ${c.weeklyDigest ? `tiap ${DAY_NAMES[c.weeklyDigest.day]} jam ${c.weeklyDigest.time}` : "mati"}`,
           `Mode notif per grup:`,
           ...(groups.length ? groups.map((g) => `- ${g.name ?? "(tanpa nama)"}: ${NOTIFY_LABEL[g.notify_mode]}`) : ["- (belum ada grup)"]),
         ].join("\n");

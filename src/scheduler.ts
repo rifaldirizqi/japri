@@ -3,6 +3,7 @@ import * as store from "./db.js";
 import { runDigestIfDue } from "./digest.js";
 import { flushHeldNotifications, ownerJid, sendToOwner } from "./notify.js";
 import { formatHM, nowTs } from "./time.js";
+import { reportUpdateResult } from "./selfupdate.js";
 import { notifyIfUpdateAvailable } from "./updater.js";
 import { sendText } from "./wa/client.js";
 
@@ -45,6 +46,9 @@ export function startScheduler() {
   setInterval(tick, 20_000);
   setInterval(() => store.pruneMessages(nowTs() - loadConfig().retentionDays * 86400), 3600_000);
   void tick();
+  // Baru nyala lagi abis update sekali klik: kabarin hasilnya
+  const owner = ownerJid();
+  if (owner) void reportUpdateResult((text) => sendText(owner, text)).catch((e) => console.error("Gagal kabarin hasil update:", e));
 
   // Cek update: 1 menit setelah nyala, terus tiap 24 jam
   // Kabar update ditahan kalau lagi jam tenang

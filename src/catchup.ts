@@ -36,11 +36,12 @@ export const commitCatchup = (batches: GroupBatch[], now: number) =>
     now,
   );
 
-export const transcript = (messages: store.StoredMessage[], tz: string) =>
+/** @param withDate tulis tanggal juga (buat transkrip lebih dari sehari) */
+export const transcript = (messages: store.StoredMessage[], tz: string, withDate = false) =>
   messages
     .map((m) => {
       const who = m.from_owner ? "OWNER" : (m.sender_name ?? "?");
-      return `[${formatHM(m.ts, tz)}] ${who}${m.for_owner ? " [→ OWNER]" : ""}: ${m.text}`;
+      return `[${withDate ? formatTs(m.ts, tz) : formatHM(m.ts, tz)}] ${who}${m.for_owner ? " [→ OWNER]" : ""}: ${m.text}`;
     })
     .join("\n");
 
@@ -59,6 +60,51 @@ export const CATCHUP_FORMAT = `Format rangkuman catch-up:
 - Kalau ada grup yang dipotong, bilang singkat di bagian grup itu.
 - Tutup dengan bagian *Perlu perhatian lo*: pertanyaan atau tugas yang ditujukan ke owner (pesan bertanda [→ OWNER] atau yang nyebut owner), plus deadline kalau ada. Kalau gak ada, lewati bagian ini.
 - Jangan bahas grup yang gak ada di transkrip.`;
+
+// ---------- Mingguan ----------
+
+const WEEK = 7 * 86400;
+const WEEKLY_PER_GROUP = 400;
+
+/**
+ * Kalau kebanyakan, ambil merata sepanjang minggu (biar awal minggu gak ilang),
+ * tapi pesan yang ditujuin ke owner selalu ikut.
+ */
+export function sampleMessages(messages: store.StoredMessage[], cap: number): store.StoredMessage[] {
+  if (messages.length <= cap) return messages;
+  const keep = new Set(messages.filter((m) => m.for_owner || m.from_owner));
+  const rest = messages.filter((m) => !keep.has(m));
+  const slots = Math.max(cap - keep.size, 0);
+  for (let i = 0; i < slots; i++) keep.add(rest[Math.floor((i * rest.length) / slots)]);
+  return messages.filter((m) => keep.has(m)).slice(-cap);
+}
+
+export function weeklyBatches(now = nowTs()): GroupBatch[] {
+  const since = now - WEEK;
+  const batches: GroupBatch[] = [];
+  for (const chat of store.listGroups()) {
+    const all = store.messagesSince(chat.jid, since);
+    if (all.length > 0) batches.push({ chat, since, total: all.length, messages: sampleMessages(all, WEEKLY_PER_GROUP) });
+  }
+  return batches.sort((a, b) => b.total - a.total);
+}
+
+export const WEEKLY_FORMAT = `Format rangkuman mingguan (gambaran besar 7 hari terakhir, bukan detail harian):
+- Satu bagian per grup, judulnya *nama grup*. Grup paling rame atau paling penting duluan.
+- Tiap grup 2–4 poin: topik besar, keputusan, dan rencana/acara ke depan (sebut tanggalnya).
+- Kalau transkrip grup diambil sebagian (disebut di judul grup), bilang singkat.
+- Tutup dengan bagian *Masih nunggu lo*: pertanyaan atau tugas buat owner (bertanda [→ OWNER]) yang kelihatannya belum dijawab owner. Kalau gak ada, lewati.`;
+
+export function weeklyPrompt(batches: GroupBatch[]): string {
+  const { timezone } = loadConfig();
+  const body = batches
+    .map((b) => {
+      const cut = b.total > b.messages.length ? `, diambil ${b.messages.length} pesan merata sepanjang minggu` : "";
+      return `=== Grup: ${b.chat.name ?? "(tanpa nama)"} — ${b.total} pesan dalam 7 hari${cut} ===\n${transcript(b.messages, timezone, true)}`;
+    })
+    .join("\n\n");
+  return `[Sekarang ${nowIsoLocal(timezone)} (${timezone})]\nBikin rangkuman mingguan semua grup.\n\n${WEEKLY_FORMAT}\n\n${body}`;
+}
 
 /** Isi pesan buat AI: instruksi format + transkrip semua grup. */
 export function catchupPrompt(batches: GroupBatch[]): string {

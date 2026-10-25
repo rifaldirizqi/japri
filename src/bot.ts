@@ -2,10 +2,13 @@ import crypto from "node:crypto";
 import { jidNormalizedUser } from "baileys";
 import { loadConfig, updateConfig } from "./config.js";
 import * as store from "./db.js";
-import { ask, resetHistory } from "./agent/agent.js";
-import { ownerJid, sendToOwner } from "./notify.js";
-import { formatHM } from "./time.js";
-import { botNumber, groupAdminIds, leaveGroup, sendText, showTyping, type IncomingMessage } from "./wa/client.js";
+import { ask, lastOwnerReplyMs, resetHistory } from "./agent/agent.js";
+import { isQuietTime, ownerJid, sendToOwner } from "./notify.js";
+import { acceptOffer, detectTask, latestOfferAfter, makeOffer } from "./tasks.js";
+import { formatHM, nowTs } from "./time.js";
+import { installUpdate } from "./selfupdate.js";
+import { describeImage, readsImages, takeImageQuota, withDescription } from "./vision.js";
+import { botNumber, downloadImage, groupAdminIds, leaveGroup, sendText, showTyping, type IncomingMessage } from "./wa/client.js";
 
 // ---------- Owner ----------
 
@@ -53,10 +56,12 @@ Ngobrol biasa aja, contoh:
 • siapa yang ngirim nomor rekening kemarin?
 • ingetin gue besok jam 9 kirim laporan
 • tiap senin jam 8 ingetin grup tim soal standup
-• kirim rangkuman tiap jam 9 malam
+• kirim rangkuman tiap hari kerja jam 9 malam
+• rangkuman mingguan tiap minggu jam 7 malam
+• baca gambar di semua grup
 • matiin notif grup alumni
 • jangan ganggu jam 10 malam sampai 6 pagi
-• ada update Japri gak?
+• ada update Japri gak? (bales *update* buat langsung update)
 
 Gue otomatis DM lo kalau ada yang tag lo, bales pesan lo, atau nyebut nama panggilan lo di grup. Tanya _"notif gue gimana?"_ buat lihat pengaturannya.
 
@@ -68,7 +73,7 @@ const groupIntro = () => {
   const { botName, retentionDays, owner } = loadConfig();
   return `Halo semua 👋 Gue *${botName}*, asisten pribadi${owner?.name ? ` punya *${owner.name}*` : ""}.
 
-Gue *mencatat pesan di grup ini* buat bikin rangkuman dan ngabarin dia kalau dia di-mention. Catatan disimpan di perangkat dia sendiri dan otomatis terhapus setelah ${retentionDays} hari.
+Gue *mencatat pesan di grup ini* buat bikin rangkuman dan ngabarin dia kalau dia di-mention. Kalau dia nyalain fitur baca gambar, gambar di grup ini juga dibaca AI dan dicatat sebagai teks. Catatan disimpan di perangkat dia sendiri dan otomatis terhapus setelah ${retentionDays} hari.
 
 Admin grup bisa ngeluarin gue kapan aja, atau ketik *@${botName} keluar*. Semua catatan grup ini bakal ikut dihapus.`;
 };
@@ -94,12 +99,21 @@ function shouldNotify(chat: store.Chat | undefined, reason: string) {
 }
 
 async function notifyOwner(m: IncomingMessage, reason: string, group: string) {
-  const { timezone } = loadConfig();
+  const { timezone, taskOffers } = loadConfig();
+  const sender = m.senderName ?? m.senderIds[0].split("@")[0];
   const text = m.text.length > 700 ? `${m.text.slice(0, 700)}…` : m.text;
-  await sendToOwner(
-    `🔔 *${m.senderName ?? m.senderIds[0].split("@")[0]}* ${reason} di *${group}* (${formatHM(m.ts, timezone)}):\n> ${text.replace(/\n/g, "\n> ")}`,
-    "mention",
-  );
+  let notif = `🔔 *${sender}* ${reason} di *${group}* (${formatHM(m.ts, timezone)}):\n> ${text.replace(/\n/g, "\n> ")}`;
+
+  // Isinya tugas? Tawarin reminder. Gagal/lama = notif tetap dikirim tanpa tawaran.
+  if (taskOffers) {
+    const now = nowTs();
+    const offer = await detectTask({ text: m.text, sender, group }, now).catch((e) => {
+      console.error("Gagal cek tugas:", e instanceof Error ? e.message : e);
+      return null;
+    });
+    if (offer) notif += `\n\n${makeOffer(offer, { sender, group }, now, isQuietTime(now))}`;
+  }
+  await sendToOwner(notif, "mention");
 }
 
 // ---------- Routing ----------
@@ -124,8 +138,9 @@ export async function handleMessage(m: IncomingMessage) {
 async function handleGroup(m: IncomingMessage, fromOwner: boolean) {
   store.upsertGroup(m.chatJid, null);
   const reason = !fromOwner && hasOwner() ? notifyReason(m) : null;
+  const id = m.raw.key.id ?? `${m.ts}-${crypto.randomUUID()}`;
   store.saveMessage({
-    id: m.raw.key.id ?? `${m.ts}-${crypto.randomUUID()}`,
+    id,
     chat_jid: m.chatJid,
     sender_name: m.senderName,
     from_owner: fromOwner ? 1 : 0,
@@ -135,6 +150,10 @@ async function handleGroup(m: IncomingMessage, fromOwner: boolean) {
   });
 
   const chat = store.getGroup(m.chatJid);
+  if (m.hasImage && hasOwner() && readsImages(chat) && takeImageQuota()) {
+    // Jalan di belakang: pesan lain gak perlu nunggu AI selesai baca gambar
+    trackImageJob(readGroupImage(m, id));
+  }
   if (reason && shouldNotify(chat, reason)) {
     await notifyOwner(m, reason, chat?.name ?? "grup").catch((e) => console.error("Gagal kirim notif:", e));
   }
@@ -146,6 +165,28 @@ async function handleGroup(m: IncomingMessage, fromOwner: boolean) {
   if (/^(keluar|\/keluar|leave)$/i.test(text)) return handleLeave(m);
   if (fromOwner) return handleCommand(m, text);
   // Orang lain nge-tag bot: diabaikan
+}
+
+// ---------- Gambar ----------
+
+const imageJobs = new Set<Promise<void>>();
+function trackImageJob(job: Promise<void>) {
+  imageJobs.add(job);
+  void job.finally(() => imageJobs.delete(job));
+}
+/** Tunggu semua gambar yang lagi dibaca selesai (dipakai tes). */
+export const imageJobsIdle = () => Promise.all([...imageJobs]);
+
+async function readGroupImage(m: IncomingMessage, id: string) {
+  try {
+    const image = await downloadImage(m.raw);
+    if (!image) return;
+    const caption = m.text === "[gambar]" ? null : m.text;
+    const description = await describeImage({ mediaType: image.mediaType, data: image.data.toString("base64") }, caption);
+    if (description) store.updateMessageText(m.chatJid, id, withDescription(m.text, description));
+  } catch (e) {
+    console.error("Gagal baca gambar:", e instanceof Error ? e.message : e);
+  }
 }
 
 async function handleLeave(m: IncomingMessage) {
@@ -163,8 +204,32 @@ async function handleLeave(m: IncomingMessage) {
   }
 }
 
+const YES = /^(ya|iya+|y|yes|yup|ok|oke+|okay|boleh|gas|sip|siap)\s*#?\s*(\d+)?\s*[.!]*$/i;
+
+/** Owner bales "ya" (atau "ya 12") ke tawaran reminder: langsung dibikin tanpa AI. */
+function answerOffer(text: string): string | null {
+  const match = text.match(YES);
+  if (!match) return null;
+  if (match[2]) {
+    const offer = store.getOffer(Number(match[2]));
+    return offer?.open ? acceptOffer(offer) : null;
+  }
+  // "ya" doang: cuma buat tawaran terbaru, dan kalau gak ada obrolan sama AI setelahnya
+  // (biar "ya" yang ngejawab pertanyaan AI gak salah dianggap nerima tawaran). Selain itu diterusin ke AI.
+  const latest = latestOfferAfter(lastOwnerReplyMs());
+  return latest ? acceptOffer(latest) : null;
+}
+
 async function handleCommand(m: IncomingMessage, text: string) {
   if (text === "" || /^\/(help|start|menu)$/i.test(text)) return sendText(m.chatJid, help(), m.raw);
+  if (!m.isGroup) {
+    const accepted = answerOffer(text);
+    if (accepted) return sendText(m.chatJid, accepted, m.raw);
+    if (/^update( japri)?[.!]*$/i.test(text)) {
+      const result = await installUpdate((t) => sendText(m.chatJid, t));
+      return result ? sendText(m.chatJid, result, m.raw) : undefined;
+    }
+  }
   if (/^\/reset$/i.test(text)) {
     resetHistory();
     return sendText(m.chatJid, "Oke, obrolan sebelumnya udah gue lupain ✅", m.raw);
@@ -172,7 +237,14 @@ async function handleCommand(m: IncomingMessage, text: string) {
 
   try {
     await showTyping(m.chatJid);
-    await sendText(m.chatJid, await ask(m.chatJid, text), m.raw);
+    // Gambar yang owner kirim sendiri ke bot selalu dibaca
+    let images;
+    if (m.hasImage && !m.isGroup) {
+      const image = await downloadImage(m.raw).catch(() => null);
+      if (image) images = [{ mediaType: image.mediaType, data: image.data.toString("base64") }];
+      if (text === "[gambar]") text = image ? "(owner ngirim gambar ini tanpa teks)" : "(owner ngirim gambar, tapi gambarnya gagal di-download)";
+    }
+    await sendText(m.chatJid, await ask(m.chatJid, text, images), m.raw);
   } catch (e) {
     console.error("Error dari AI:", e);
     const detail = e instanceof Error ? e.message.slice(0, 200) : "";

@@ -1,7 +1,7 @@
 services:
   japri:
-    build: .
-    image: japri
+    image: ghcr.io/rifaldirizqi/japri:latest
+    # Mau build sendiri dari kode di folder ini? Ganti baris image di atas jadi:  build: .
     restart: unless-stopped
     stdin_open: true   # buat wizard setup
     tty: true

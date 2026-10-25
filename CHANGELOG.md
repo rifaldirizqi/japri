@@ -5,6 +5,15 @@ dan ringkasannya dikirim ke owner lewat WhatsApp waktu ada update.
 
 Format tiap versi: `## [x.y.z] - YYYY-MM-DD`, terus daftar poin (`- ...`) pakai bahasa yang dimengerti user awam.
 
+## [0.3.0] - 2026-10-25
+
+- Tugas → reminder: notif yang isinya tugas (_"Ndi, kirim laporan Jumat ya"_) ditambahin _"Mau gue ingetin?"_. Bales *ya*, atau sebut jam lain. Bisa dimatiin: _"matiin saran reminder"_
+- Baca gambar: poster, jadwal, dan struk di grup dibaca AI, terus ikut masuk rangkuman dan pencarian. Default mati, nyalain pakai _"baca gambar di semua grup"_
+- Kirim gambar langsung ke Japri, mis. poster + _"ingetin gue acara ini"_
+- Digest harian bisa hari kerja aja, plus digest mingguan: _"rangkuman mingguan tiap Minggu jam 7 malam"_
+- Windows: mulai versi ini, update cukup bales *update* ke kabar versi baru. Japri download, pasang, dan nyala lagi sendiri
+- Docker: image siap pakai, gak perlu build sendiri, jalan juga di Raspberry Pi. Update cukup `docker compose pull && docker compose up -d`
+
 ## [0.2.0] - 2026-10-25
 
 - _"Gue ketinggalan apa?"_: satu pesan berisi rangkuman semua grup sejak terakhir lo nimbrung, plus bagian "Perlu perhatian lo"

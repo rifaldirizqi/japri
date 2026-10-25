@@ -62,6 +62,21 @@ CREATE TABLE IF NOT EXISTS held_notifications (
   text TEXT NOT NULL,
   ts   INTEGER NOT NULL
 );
+
+-- Penghitung harian (mis. jumlah gambar yang dibaca AI)
+CREATE TABLE IF NOT EXISTS counters (
+  key   TEXT PRIMARY KEY,
+  value INTEGER NOT NULL
+);
+
+-- Tawaran reminder dari notif mention yang isinya tugas (v0.3.0)
+CREATE TABLE IF NOT EXISTS offers (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  text       TEXT NOT NULL,      -- isi reminder kalau diterima
+  due_ts     INTEGER NOT NULL,   -- waktu yang ditawarin
+  created_ts INTEGER NOT NULL,
+  open       INTEGER NOT NULL DEFAULT 1
+);
 `);
 
 // ---------- Migrasi dari versi lama ----------
@@ -74,9 +89,17 @@ function addColumn(table: string, column: string, definition: string) {
 addColumn("chats", "notify_mode", "TEXT NOT NULL DEFAULT 'all'"); // 'all' | 'mentions' | 'off'
 addColumn("chats", "caught_up_ts", "INTEGER"); // catch-up/digest terakhir yang nyakup grup ini
 addColumn("messages", "for_owner", "INTEGER NOT NULL DEFAULT 0"); // pesan yang nge-tag/bales/nyebut owner
+// v0.3.0
+addColumn("chats", "read_images", "INTEGER"); // null = ikut pengaturan umum, 1/0 = khusus grup ini
 
 export type NotifyMode = "all" | "mentions" | "off";
-export type Chat = { jid: string; name: string | null; notify_mode: NotifyMode; caught_up_ts: number | null };
+export type Chat = {
+  jid: string;
+  name: string | null;
+  notify_mode: NotifyMode;
+  caught_up_ts: number | null;
+  read_images: number | null;
+};
 export type StoredMessage = {
   id: string;
   chat_jid: string;
@@ -104,6 +127,9 @@ export const upsertGroup = (jid: string, name: string | null) =>
 
 export const getGroup = (jid: string) => db.prepare(`SELECT * FROM chats WHERE jid = ?`).get(jid) as Chat | undefined;
 export const listGroups = () => db.prepare(`SELECT * FROM chats ORDER BY name`).all() as Chat[];
+
+export const setReadImages = (jid: string, value: number | null) =>
+  db.prepare(`UPDATE chats SET read_images = ? WHERE jid = ?`).run(value, jid);
 
 export const setNotifyMode = (jid: string, mode: NotifyMode) =>
   db.prepare(`UPDATE chats SET notify_mode = ? WHERE jid = ?`).run(mode, jid);
@@ -140,6 +166,9 @@ export const saveMessage = (m: StoredMessage) =>
     )
     .run({ for_owner: 0, ...m });
 
+export const updateMessageText = (chatJid: string, id: string, text: string) =>
+  db.prepare(`UPDATE messages SET text = ? WHERE chat_jid = ? AND id = ?`).run(text, chatJid, id);
+
 export function getMessages(chatJid: string, sinceTs: number, limit = 1500): StoredMessage[] {
   const rows = db
     .prepare(`SELECT * FROM messages WHERE chat_jid = ? AND ts >= ? ORDER BY ts DESC LIMIT ?`)
@@ -154,6 +183,14 @@ export function messagesAfter(chatJid: string, afterTs: number, limit: number) {
     .prepare(`SELECT * FROM messages WHERE chat_jid = ? AND ts > ? ORDER BY ts DESC LIMIT ?`)
     .all(chatJid, afterTs, limit) as StoredMessage[];
   return { total: n, messages: rows.reverse() };
+}
+
+/** Semua pesan setelah `afterTs` (dibatasi `max` terbaru), urut lama → baru. */
+export function messagesSince(chatJid: string, afterTs: number, max = 5000): StoredMessage[] {
+  const rows = db
+    .prepare(`SELECT * FROM messages WHERE chat_jid = ? AND ts > ? ORDER BY ts DESC LIMIT ?`)
+    .all(chatJid, afterTs, max) as StoredMessage[];
+  return rows.reverse();
 }
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -207,3 +244,33 @@ export const heldNotifications = () =>
   db.prepare(`SELECT * FROM held_notifications ORDER BY id`).all() as { id: number; kind: "mention" | "other"; text: string; ts: number }[];
 
 export const deleteHeldNotifications = (maxId: number) => db.prepare(`DELETE FROM held_notifications WHERE id <= ?`).run(maxId);
+
+// ---------- Tawaran reminder ----------
+
+export type Offer = { id: number; text: string; due_ts: number; created_ts: number; open: number };
+
+export function addOffer(text: string, dueTs: number, createdTs: number): number {
+  return Number(db.prepare(`INSERT INTO offers (text, due_ts, created_ts) VALUES (?, ?, ?)`).run(text, dueTs, createdTs).lastInsertRowid);
+}
+
+export const getOffer = (id: number) => db.prepare(`SELECT * FROM offers WHERE id = ?`).get(id) as Offer | undefined;
+
+/** Tawaran yang belum dijawab sejak `sinceTs`, terbaru duluan. */
+export const openOffers = (sinceTs: number) =>
+  db.prepare(`SELECT * FROM offers WHERE open = 1 AND created_ts >= ? ORDER BY id DESC`).all(sinceTs) as Offer[];
+
+export const closeOffer = (id: number) => db.prepare(`UPDATE offers SET open = 0 WHERE id = ?`).run(id);
+
+// ---------- Penghitung ----------
+
+/** Naikin penghitung kalau masih di bawah `max`. Return false kalau udah mentok. */
+export function incrementCounter(key: string, max: number): boolean {
+  const row = db.prepare(`SELECT value FROM counters WHERE key = ?`).get(key) as { value: number } | undefined;
+  if ((row?.value ?? 0) >= max) return false;
+  db.prepare(`INSERT INTO counters (key, value) VALUES (?, 1) ON CONFLICT(key) DO UPDATE SET value = value + 1`).run(key);
+  return true;
+}
+
+/** Hapus penghitung lama (key diawali `prefix`, selain `keep`). */
+export const pruneCounters = (prefix: string, keep: string) =>
+  db.prepare(`DELETE FROM counters WHERE key LIKE ? AND key != ?`).run(`${prefix}%`, keep);

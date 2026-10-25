@@ -42,6 +42,8 @@ export type Release = {
   url: string;
   notes: string;
   installerUrl: string | null;
+  /** Buat update sekali klik: ukuran & checksum installer dari GitHub */
+  installer: { url: string; size: number; sha256: string | null } | null;
 };
 
 type GitHubRelease = {
@@ -49,7 +51,7 @@ type GitHubRelease = {
   html_url: string;
   body: string | null;
   draft: boolean;
-  assets: { name: string; browser_download_url: string }[];
+  assets: { name: string; browser_download_url: string; size?: number; digest?: string | null }[];
 };
 
 /** Rilis dengan versi tertinggi (pre-release ikut dihitung, draft enggak). */
@@ -64,11 +66,15 @@ export async function fetchLatestRelease(): Promise<Release | null> {
   const releases = ((await res.json()) as GitHubRelease[]).filter((r) => !r.draft && parseVersion(r.tag_name));
   if (releases.length === 0) return null;
   const latest = releases.reduce((a, b) => (compareVersions(b.tag_name, a.tag_name) > 0 ? b : a));
+  const asset = latest.assets.find((a) => /^JapriSetup-.*\.exe$/i.test(a.name));
   return {
     version: latest.tag_name.replace(/^v/, ""),
     url: latest.html_url,
     notes: latest.body ?? "",
-    installerUrl: latest.assets.find((a) => /^JapriSetup-.*\.exe$/i.test(a.name))?.browser_download_url ?? null,
+    installerUrl: asset?.browser_download_url ?? null,
+    installer: asset
+      ? { url: asset.browser_download_url, size: asset.size ?? 0, sha256: asset.digest?.match(/^sha256:([0-9a-f]{64})$/i)?.[1].toLowerCase() ?? null }
+      : null,
   };
 }
 
@@ -92,13 +98,19 @@ export function summarizeNotes(markdown: string, maxItems = 8): string {
   return items.slice(0, maxItems).join("\n") + extra;
 }
 
+/** Installer Windows bisa update dirinya sendiri (bales "update"). */
+export const canSelfUpdate = () => isDesktop && process.platform === "win32";
+
 function howToUpdate(r: Release): string {
+  if (canSelfUpdate() && r.installer?.sha256) {
+    return `Bales *update* buat update sekarang. Japri bakal mati bentar (±1 menit), terus nyala lagi sendiri. Data lo tetap aman.\n_(Atau download manual: ${r.installer.url})_`;
+  }
   if (isDesktop) {
     return r.installerUrl
       ? `Download installer-nya, terus jalanin (Japri yang lagi jalan otomatis dimatiin, data lo tetap aman):\n${r.installerUrl}`
       : `Download installer terbaru di: ${r.url}`;
   }
-  if (process.env.RUNNING_IN_DOCKER) return "Jalanin di folder Japri:\n```git pull && docker compose up -d --build```";
+  if (process.env.RUNNING_IN_DOCKER) return "Jalanin di folder Japri:\n```docker compose pull && docker compose up -d```\n(Kalau build sendiri dari kode: ```git pull && docker compose up -d --build```)";
   return "Jalanin di folder Japri:\n```git pull && npm install```\nterus restart Japri.";
 }
 

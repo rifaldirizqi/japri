@@ -1,6 +1,7 @@
 import type { Boom } from "@hapi/boom";
 import makeWASocket, {
   DisconnectReason,
+  downloadMediaMessage,
   fetchLatestBaileysVersion,
   isJidGroup,
   isLidUser,
@@ -32,6 +33,8 @@ export type IncomingMessage = {
   mentionedIds: string[];
   quotedSenderId: string | null;
   mentionsBot: boolean;
+  /** Ada gambar yang bisa dibaca (bukan stiker / sekali lihat) */
+  hasImage: boolean;
 };
 
 export type Handlers = {
@@ -56,6 +59,17 @@ export const botNumber = () => sock?.user?.id.split(/[:@]/)[0] ?? "";
 export async function sendText(jid: string, text: string, quoted?: WAMessage) {
   if (!sock) throw new Error("WhatsApp belum terhubung");
   await sock.sendMessage(jid, { text }, quoted ? { quoted } : undefined);
+}
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Download gambar dari pesan (buat dibaca AI). Null kalau gak ada / kegedean. */
+export async function downloadImage(raw: WAMessage): Promise<{ data: Buffer; mediaType: string } | null> {
+  const image = normalizeMessageContent(raw.message)?.imageMessage;
+  if (!image || !sock) return null;
+  if (Number(image.fileLength ?? 0) > MAX_IMAGE_BYTES) return null;
+  const data = await downloadMediaMessage(raw, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+  return { data, mediaType: image.mimetype?.split(";")[0] || "image/jpeg" };
 }
 
 export const showTyping = (jid: string) => sock?.sendPresenceUpdate("composing", jid).catch(() => undefined);
@@ -135,6 +149,7 @@ async function parse(msg: WAMessage): Promise<IncomingMessage | null> {
     : await resolveIds(chatJid, msg.key.remoteJidAlt);
   if (senderIds.length === 0) return null;
 
+  const viewOnce = !!(msg.message?.viewOnceMessage || msg.message?.viewOnceMessageV2 || msg.message?.viewOnceMessageV2Extension || content?.imageMessage?.viewOnce);
   const ctx = extractContextInfo(content);
   const mentionedIds = (ctx?.mentionedJid ?? []).map(jidNormalizedUser);
   const quotedSenderId = ctx?.participant ? jidNormalizedUser(ctx.participant) : null;
@@ -150,6 +165,7 @@ async function parse(msg: WAMessage): Promise<IncomingMessage | null> {
     mentionedIds,
     quotedSenderId,
     mentionsBot: mentionedIds.some(isBotId) || isBotId(quotedSenderId),
+    hasImage: !!content?.imageMessage && !viewOnce,
   };
 }
 

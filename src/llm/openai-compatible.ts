@@ -12,7 +12,17 @@ export function createOpenAICompatible(cfg: LLMConfig): LLM {
       const byName = new Map(tools.map((t) => [t.name, t]));
       const messages: OpenAI.ChatCompletionMessageParam[] = [
         { role: "system", content: system },
-        ...history.map((t) => ({ role: t.role, content: t.text })),
+        ...history.map((t): OpenAI.ChatCompletionMessageParam =>
+          t.role === "user" && t.images?.length
+            ? {
+                role: "user",
+                content: [
+                  ...t.images.map((img) => ({ type: "image_url" as const, image_url: { url: `data:${img.mediaType};base64,${img.data}` } })),
+                  { type: "text" as const, text: t.text },
+                ],
+              }
+            : { role: t.role, content: t.text },
+        ),
       ];
       const toolDefs = tools.map(toFunctionTool);
 

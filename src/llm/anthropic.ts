@@ -21,7 +21,18 @@ export function createAnthropic(cfg: LLMConfig): LLM {
         ...(supportsEffort(cfg.model) ? { output_config: { effort: "medium" as const } } : {}),
         cache_control: { type: "ephemeral" as const },
         system,
-        messages: history.map((t) => ({ role: t.role, content: t.text })),
+        messages: history.map((t) => ({
+          role: t.role,
+          content: t.images?.length
+            ? [
+                ...t.images.map((img) => ({
+                  type: "image" as const,
+                  source: { type: "base64" as const, media_type: img.mediaType as "image/jpeg", data: img.data },
+                })),
+                { type: "text" as const, text: t.text },
+              ]
+            : t.text,
+        })),
       };
       const final =
         tools.length === 0

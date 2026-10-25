@@ -8,7 +8,7 @@ import assert from "node:assert";
 const sent: { to: string; text: string }[] = [];
 const prompts: string[] = [];
 mock.module("../src/wa/client.js", { namedExports: { sendText: async (to: string, text: string) => { sent.push({ to, text }); } } });
-mock.module("../src/agent/agent.js", { namedExports: { summarize: async (p: string) => { prompts.push(p); return "RANGKUMAN"; } } });
+mock.module("../src/agent/agent.js", { namedExports: { summarize: async (p: string) => { prompts.push(p); return "RANGKUMAN"; }, rememberForOwner: () => {} } });
 const { saveConfig, newConfig, loadConfig, updateConfig } = await import("../src/config.js");
 saveConfig(newConfig({ provider: "openai", model: "m" }, { owner: { ids: ["6280000000001@s.whatsapp.net"], name: "Andi" } }));
 const store = await import("../src/db.js");
@@ -136,4 +136,34 @@ test("digest: telat < 12 jam dikirim + ditandai; > 12 jam dilewati", async () =>
   await runDigestIfDue(slot2 + 3 * H); // 00:00, telat 3 jam
   assert.equal(sent.length, 2); assert.match(sent[1].text, /telat, harusnya jam 21:00/); assert.match(prompts.at(-1)!, /deadline senin/);
   updateConfig({ digest: null });
+});
+
+test("digest hari kerja: Sabtu & Minggu dilewati", async () => {
+  // NOON = Sabtu 24 Okt. Senin 26 Okt 21:00 = jadwal hari kerja pertama setelahnya.
+  const sat = NOON + 9 * H; // Sabtu 21:00
+  assert.equal(time.lastSlot(21 * 60, sat + 60, "Asia/Jakarta", [1, 2, 3, 4, 5]), sat - 24 * H); // Jumat 21:00
+  assert.equal(time.lastSlot(21 * 60, sat + 2 * 24 * H + 60, "Asia/Jakarta", [1, 2, 3, 4, 5]), sat + 2 * 24 * H); // Senin
+  assert.equal(time.localWeekday(NOON, "Asia/Jakarta"), 6);
+});
+
+test("digest mingguan: dikirim di harinya, gak ngubah titik mulai catch-up", async () => {
+  sent.length = 0;
+  const sun = NOON + 8 * 24 * H + 7 * H; // Minggu 1 Nov 19:00
+  updateConfig({ digest: null, weeklyDigest: { day: 0, time: "19:00" }, weeklyHandledTs: sun - 7 * 24 * H });
+  save(R, sun - 2 * 24 * H, { text: "arisan bulan depan di rumah Sari" });
+  const before = store.getGroup(R)!.caught_up_ts;
+  await runDigestIfDue(sun - 60); assert.equal(sent.length, 0); // belum waktunya
+  await runDigestIfDue(sun + 60);
+  assert.equal(sent.length, 1); assert.match(sent[0].text, /^🗓️ \*Rangkuman mingguan\*\n\nRANGKUMAN$/);
+  assert.match(prompts.at(-1)!, /arisan bulan depan/); assert.match(prompts.at(-1)!, /Masih nunggu lo/);
+  assert.equal(store.getGroup(R)!.caught_up_ts, before);
+  await runDigestIfDue(sun + 3600); assert.equal(sent.length, 1);
+  updateConfig({ weeklyDigest: null });
+});
+
+test("mingguan: grup rame diambil merata, pesan buat owner selalu ikut", () => {
+  const msgs = Array.from({ length: 1000 }, (_, i) => ({ id: `s${i}`, chat_jid: K, sender_name: "A", from_owner: 0, for_owner: i === 3 ? 1 : 0, text: "x", ts: i }));
+  const out = catchup.sampleMessages(msgs, 100);
+  assert.equal(out.length, 100); assert.ok(out.some((m) => m.ts === 3)); assert.ok(out[0].ts < 20); assert.ok(out.at(-1)!.ts > 980);
+  assert.equal(catchup.sampleMessages(msgs.slice(0, 50), 100).length, 50);
 });

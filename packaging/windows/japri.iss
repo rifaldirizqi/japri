@@ -72,6 +72,8 @@ Name: "{userstartup}\Japri"; Filename: "{app}\Japri.exe"; IconFilename: "{app}\j
 
 [Run]
 Filename: "{app}\Japri.exe"; Description: "Jalankan Japri sekarang"; Flags: postinstall nowait skipifsilent
+; Update sekali klik (installer dijalanin Japri tanpa jendela): nyalain lagi Japri di tray
+Filename: "{app}\Japri.exe"; Parameters: "--tray"; Flags: nowait; Check: WizardSilent
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM Japri.exe"; Flags: runhidden; RunOnceId: "StopJapri"

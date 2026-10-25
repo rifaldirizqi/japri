@@ -98,3 +98,48 @@ test("catatan rilis diubah jadi poin WhatsApp", () => {
   const many = Array.from({ length: 12 }, (_, i) => `- item ${i}`).join("\n");
   assert.match(updater.summarizeNotes(many), /…dan 4 perubahan lain$/);
 });
+
+describe("update sekali klik", async () => {
+  const crypto = await import("node:crypto");
+  const selfupdate = await import("../src/selfupdate.js");
+  const { DATA_DIR } = await import("../src/config.js");
+  const data = Buffer.from("isi installer palsu");
+  const sha = crypto.createHash("sha256").update(data).digest("hex");
+
+  test("ukuran & checksum installer dibaca dari GitHub", async () => {
+    releases = [release("v7.0.0", { assets: [{ name: "JapriSetup-7.0.0.exe", browser_download_url: "https://dl/a.exe", size: data.length, digest: `sha256:${sha}` }] })];
+    const s = await updater.checkForUpdate();
+    assert.deepEqual(s.kind === "available" && s.release.installer, { url: "https://dl/a.exe", size: data.length, sha256: sha });
+    releases = [release("v7.0.0")]; // rilis lama tanpa digest
+    const old = await updater.checkForUpdate();
+    assert.equal(old.kind === "available" && old.release.installer?.sha256, null);
+  });
+
+  test("verifikasi installer: ukuran & SHA-256", () => {
+    assert.equal(selfupdate.verifyInstaller(data, { size: data.length, sha256: sha }), null);
+    assert.match(selfupdate.verifyInstaller(data, { size: data.length + 1, sha256: sha })!, /ukuran/);
+    assert.match(selfupdate.verifyInstaller(Buffer.from("isi installer palsX"), { size: data.length, sha256: sha })!, /checksum/);
+  });
+
+  test("bukan installer Windows (Docker/Node): 'update' dibales instruksi manual", async () => {
+    releases = [release("v7.0.0")];
+    const progress: string[] = [];
+    const out = await selfupdate.installUpdate(async (t) => void progress.push(t));
+    assert.match(out!, /Japri v7\.0\.0 udah rilis/); assert.match(out!, /git pull/); assert.equal(progress.length, 0);
+    releases = [];
+    assert.match((await selfupdate.installUpdate(async () => {}))!, /udah versi terbaru/);
+  });
+
+  test("abis nyala lagi: kabarin hasil update sekali", async () => {
+    const marker = path.join(DATA_DIR, "update.json");
+    const sent: string[] = [];
+    const send = async (t: string) => void sent.push(t);
+    fs.writeFileSync(marker, JSON.stringify({ from: "0.0.1", to: updater.currentVersion, url: "https://dl/a.exe", notes: "• Fitur baru", ts: Date.now() }));
+    await selfupdate.reportUpdateResult(send);
+    await selfupdate.reportUpdateResult(send);
+    assert.equal(sent.length, 1); assert.match(sent[0], new RegExp(`✅ Udah update ke v${updater.currentVersion.replace(/\./g, "\\.")}\\.\\n\\n\\*Yang baru:\\*\\n• Fitur baru`));
+    fs.writeFileSync(marker, JSON.stringify({ from: updater.currentVersion, to: "9.9.9", url: "https://dl/a.exe", notes: "", ts: Date.now() }));
+    await selfupdate.reportUpdateResult(send);
+    assert.match(sent[1], /⚠️ Update ke v9\.9\.9 gagal/);
+  });
+});

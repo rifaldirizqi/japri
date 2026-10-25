@@ -30,11 +30,18 @@ export type Config = {
   /** Versi terakhir yang udah dikabarin ke owner (biar gak dikabarin berulang) */
   notifiedVersion?: string;
   /** Digest harian; null/undefined = mati */
-  digest?: { time: string } | null;
+  digest?: { time: string; weekdaysOnly?: boolean } | null;
   /** Jadwal digest terakhir yang udah diurus (dikirim atau dilewati), biar gak dobel */
   digestHandledTs?: number;
+  /** Digest mingguan (day: 0 = Minggu … 6 = Sabtu); null/undefined = mati */
+  weeklyDigest?: { day: number; time: string } | null;
+  weeklyHandledTs?: number;
   /** Jam tenang ("HH:MM"), boleh lewat tengah malam; null/undefined = mati */
   quietHours?: { start: string; end: string } | null;
+  /** Notif mention yang isinya tugas ditambahin tawaran reminder */
+  taskOffers: boolean;
+  /** Gambar di grup dibaca AI (bisa diubah per grup) */
+  readImages: boolean;
 };
 
 const DEFAULTS: Omit<Config, "llm"> = {
@@ -43,6 +50,8 @@ const DEFAULTS: Omit<Config, "llm"> = {
   retentionDays: 30,
   nicknames: [],
   checkUpdates: true,
+  taskOffers: true,
+  readImages: false,
 };
 
 let current: Config | null = null;

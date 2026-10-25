@@ -106,3 +106,19 @@ export function lastOccurrence(minutes: number, now: number, tz: string): number
   slot = slotLocal - offsetMinutes(slot, tz) * 60;
   return slot > now ? slot - 86400 : slot;
 }
+
+/** Tanggal lokal "YYYY-MM-DD". */
+export const localDate = (ts: number, tz: string) =>
+  formatter(`date:${tz}`, () => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" })).format(
+    new Date(ts * 1000),
+  );
+
+/** Hari lokal: 0 = Minggu … 6 = Sabtu. */
+export const localWeekday = (ts: number, tz: string) => new Date(`${localDate(ts, tz)}T12:00:00Z`).getUTCDay();
+
+/** Kayak lastOccurrence, tapi cuma di hari-hari tertentu (0 = Minggu … 6 = Sabtu). */
+export function lastSlot(minutes: number, now: number, tz: string, days?: number[]): number {
+  let slot = lastOccurrence(minutes, now, tz);
+  for (let i = 0; days && i < 7 && !days.includes(localWeekday(slot, tz)); i++) slot -= 86400;
+  return slot;
+}
