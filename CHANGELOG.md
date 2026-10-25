@@ -5,6 +5,14 @@ dan ringkasannya dikirim ke owner lewat WhatsApp waktu ada update.
 
 Format tiap versi: `## [x.y.z] - YYYY-MM-DD`, terus daftar poin (`- ...`) pakai bahasa yang dimengerti user awam.
 
+## [0.3.1] - 2026-10-25
+
+- Windows: setup sekarang pakai jendela wizard kayak aplikasi Windows biasa, ada tombol Kembali, Lanjut, dan Batal. Dari pilih AI sampai scan QR WhatsApp, semuanya di satu jendela, gak pakai layar hitam lagi
+- Windows: scan QR dan daftar jadi owner langsung di jendela setup. Ada tombol buat buka WhatsApp dan kirim kode setup-nya
+- Salah pilih waktu setup? Tinggal balik ke langkah sebelumnya. Isian yang udah diketik gak ilang
+- Ganti pengaturan AI gak perlu tempel API key lagi kalau provider-nya sama
+- Lihat jendela baru ini lewat tombol "Ganti pengaturan AI" di jendela Japri
+
 ## [0.3.0] - 2026-10-25
 
 - Tugas → reminder: notif yang isinya tugas (_"Ndi, kirim laporan Jumat ya"_) ditambahin _"Mau gue ingetin?"_. Bales *ya*, atau sebut jam lain. Bisa dimatiin: _"matiin saran reminder"_
