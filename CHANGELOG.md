@@ -11,6 +11,7 @@ Format tiap versi: `## [x.y.z] - YYYY-MM-DD`, terus daftar poin (`- ...`) pakai 
 - Baca gambar: poster, jadwal, dan struk di grup dibaca AI, terus ikut masuk rangkuman dan pencarian. Default mati, nyalain pakai _"baca gambar di semua grup"_
 - Kirim gambar langsung ke Japri, mis. poster + _"ingetin gue acara ini"_
 - Digest harian bisa hari kerja aja, plus digest mingguan: _"rangkuman mingguan tiap Minggu jam 7 malam"_
+- Windows: versi Japri sekarang kelihatan di jendela Japri dan di menu klik kanan ikon tray
 - Windows: mulai versi ini, update cukup bales *update* ke kabar versi baru. Japri download, pasang, dan nyala lagi sendiri
 - Docker: image siap pakai, gak perlu build sendiri, jalan juga di Raspberry Pi. Update cukup `docker compose pull && docker compose up -d`
 

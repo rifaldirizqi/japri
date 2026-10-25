@@ -17,6 +17,7 @@ const (
 	idStatus = 101 + iota
 	idBot
 	idAI
+	idVersion
 	idLogLabel
 	idLog
 	idHint
@@ -81,7 +82,7 @@ func newMainWindow(t *tray) (*mainWindow, error) {
 	}
 	hwnd, _, err := procCreateWindowExW.Call(0, uintptr(unsafe.Pointer(utf16Ptr(mainClass))),
 		uintptr(unsafe.Pointer(utf16Ptr("Japri"))), wsOverlappedWindow,
-		cwUseDefault, cwUseDefault, uintptr(w.px(580)), uintptr(w.px(560)), 0, 0, hInst, 0)
+		cwUseDefault, cwUseDefault, uintptr(w.px(580)), uintptr(w.px(584)), 0, 0, hInst, 0)
 	if hwnd == 0 {
 		return nil, err
 	}
@@ -96,6 +97,7 @@ func newMainWindow(t *tray) (*mainWindow, error) {
 	static(idStatus, w.fontBold)
 	static(idBot, w.fontUI)
 	static(idAI, w.fontUI)
+	static(idVersion, w.fontUI)
 	button(idBtnSetup, "Ganti pengaturan AI")
 	button(idBtnData, "Buka folder data")
 	button(idBtnQR, "Buka halaman QR")
@@ -105,8 +107,9 @@ func newMainWindow(t *tray) (*mainWindow, error) {
 	static(idHint, w.fontUI)
 	button(idBtnQuit, "Keluar")
 	procSendMessageW.Call(w.ctl[idLog], emSetLimitText, 0, 0)
+	w.setText(idVersion, "Versi:  "+version)
 	w.setText(idLogLabel, "Log")
-	w.setText(idHint, "Tutup jendela ini, Japri tetap jalan di tray (pojok kanan bawah, deket jam).")
+	w.setText(idHint, "Tutup jendela ini, Japri tetap jalan di tray.")
 
 	w.refresh()
 	w.reloadLog()
@@ -174,9 +177,10 @@ func (w *mainWindow) layout() {
 	move(idStatus, m, m, inner, w.px(30))
 	move(idBot, m, m+w.px(36), inner, w.px(22))
 	move(idAI, m, m+w.px(60), inner, w.px(22))
+	move(idVersion, m, m+w.px(84), inner, w.px(22))
 
 	// Baris tombol; yang disembunyiin gak makan tempat
-	x, y, bh := m, m+w.px(96), w.px(32)
+	x, y, bh := m, m+w.px(120), w.px(32)
 	s := w.t.state()
 	for _, b := range []struct {
 		id, width int

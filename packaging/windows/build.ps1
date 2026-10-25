@@ -51,7 +51,7 @@ $env:GOOS = "windows"; $env:GOARCH = "amd64"
 # -H windowsgui: Japri.exe jalan tanpa jendela console (cuma ikon di system tray)
 # -unsafeptr=false: pointer dari Windows (lParam) memang perlu diubah ke struct
 Run "go vet" { go vet -unsafeptr=false . }
-Run "go build" { go build -ldflags "-s -w -H windowsgui" -o "$Stage\Japri.exe" . }
+Run "go build" { go build -ldflags "-s -w -H windowsgui -X main.version=$Version" -o "$Stage\Japri.exe" . }
 Remove-Item rsrc_windows_amd64.syso
 Pop-Location
 

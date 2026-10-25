@@ -298,7 +298,7 @@ func (t *tray) showMenu() {
 		}
 		procAppendMenuW.Call(m, flags, uintptr(id), uintptr(unsafe.Pointer(p)))
 	}
-	add(mfString|mfGrayed, 0, "Japri: "+stateText[s])
+	add(mfString|mfGrayed, 0, "Japri "+version+": "+stateText[s])
 	add(mfSeparator, 0, "")
 	add(mfString, menuOpen, "Buka Japri")
 	procSetMenuDefaultItem.Call(m, menuOpen, 0)

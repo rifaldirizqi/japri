@@ -28,6 +28,9 @@ import (
 	"unsafe"
 )
 
+// Versi Japri, diisi waktu build dari package.json: -ldflags "-X main.version=x.y.z" (lihat build.ps1)
+var version = "dev"
+
 type paths struct {
 	exe, node, app, data, log, qr, config, lock string
 }
