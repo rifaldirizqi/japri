@@ -64,6 +64,11 @@ func (s *supervisor) killNow() {
 	if pid == 0 {
 		return
 	}
+	killTree(pid)
+}
+
+// killTree matiin satu proses berikut anak-anaknya.
+func killTree(pid int) {
 	cmd := exec.Command(filepath.Join(os.Getenv("SystemRoot"), "System32", "taskkill.exe"), "/F", "/T", "/PID", strconv.Itoa(pid))
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
 	_ = cmd.Run()
@@ -152,9 +157,9 @@ func (s *supervisor) run(setup string, showWindow bool) {
 	}
 }
 
-// runSetupWindow buka jendela console buat wizard / scan QR, dan nunggu sampai ketutup.
+// runSetupWindow buka jendela setup (wizard, scan QR, klaim owner), dan nunggu sampai ketutup.
 func (s *supervisor) runSetupWindow(mode string) {
-	cmd := exec.Command(s.p.exe, "__console", mode)
+	cmd := exec.Command(s.p.exe, "__setup", mode)
 	if err := cmd.Start(); err != nil {
 		messageBox("Japri", "Gagal buka jendela setup: "+err.Error())
 		return

@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Japri Setup</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #ffffff;
+    --bar: #f3f3f3;
+    --line: #e5e5e5;
+    --text: #1b1b1b;
+    --muted: #5d5d5d;
+    --accent: #0f7b4f;
+    --accent-hover: #0c6a44;
+    --accent-soft: #e8f4ee;
+    --danger: #c42b1c;
+    --danger-soft: #fdf3f2;
+    --field: #ffffff;
+    --field-line: #c8c8c8;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden; user-select: none;
+  }
+  header {
+    display: flex; align-items: center; gap: 16px; padding: 18px 28px;
+    border-bottom: 1px solid var(--line); background: var(--bg);
+  }
+  header .text { flex: 1; min-width: 0; }
+  header h1 { font-size: 17px; font-weight: 600; margin: 0; }
+  header p { margin: 2px 0 0; color: var(--muted); }
+  .logo {
+    width: 44px; height: 44px; border-radius: 10px; background: var(--accent); color: #fff;
+    display: grid; place-items: center; font-weight: 700; font-size: 22px; flex: none;
+  }
+  main { flex: 1; overflow-y: auto; padding: 22px 28px; }
+  footer {
+    display: flex; align-items: center; gap: 8px; padding: 12px 20px 12px 28px;
+    background: var(--bar); border-top: 1px solid var(--line);
+  }
+  footer .step { flex: 1; color: var(--muted); font-size: 13px; }
+  button {
+    font: inherit; min-width: 96px; height: 32px; padding: 0 14px; border-radius: 4px; cursor: pointer;
+    border: 1px solid #d1d1d1; background: #fdfdfd; color: var(--text);
+  }
+  button:hover:not(:disabled) { background: #f5f5f5; }
+  button:disabled { color: #a0a0a0; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+  button.primary:disabled { background: #c9c9c9; border-color: #c9c9c9; color: #fff; }
+  button.link { min-width: 0; height: auto; padding: 0; border: 0; background: none; color: var(--accent); text-decoration: underline; }
+  button.link:hover:not(:disabled) { background: none; }
+  .hidden { display: none !important; }
+
+  h2 { font-size: 14px; font-weight: 600; margin: 18px 0 6px; }
+  p { margin: 0 0 10px; }
+  ol, ul { margin: 0 0 12px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  .muted { color: var(--muted); }
+  .note { background: var(--accent-soft); border-radius: 6px; padding: 10px 12px; margin: 12px 0; }
+  .error { background: var(--danger-soft); color: var(--danger); border-radius: 6px; padding: 10px 12px; margin: 12px 0; user-select: text; }
+
+  label.field { display: block; margin: 0 0 14px; }
+  label.field span { display: block; margin-bottom: 4px; }
+  input[type=text], input[type=password], select {
+    font: inherit; width: 100%; height: 32px; padding: 0 10px; border-radius: 4px; user-select: text;
+    border: 1px solid var(--field-line); border-bottom-color: #8a8a8a; background: var(--field); color: var(--text);
+  }
+  input:focus, select:focus { outline: none; border-bottom: 2px solid var(--accent); }
+  select[size] { height: auto; padding: 4px; }
+  select[size] option { padding: 3px 6px; border-radius: 3px; }
+
+  .choices { display: grid; gap: 6px; }
+  .choice {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  .choice:hover { background: #fafafa; }
+  .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .choice input { accent-color: var(--accent); margin: 0; }
+
+  .spin {
+    display: inline-block; width: 14px; height: 14px; vertical-align: -2px; margin-right: 8px;
+    border: 2px solid #c8c8c8; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .qr { display: flex; gap: 24px; align-items: flex-start; }
+  .qr ol { flex: 1; }
+  .qr img { width: 220px; height: 220px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: 6px; flex: none; }
+  .code {
+    font: 600 30px/1 Consolas, "Cascadia Mono", monospace; letter-spacing: 6px; user-select: text;
+    background: var(--bar); border: 1px solid var(--line); border-radius: 6px; padding: 14px 18px; display: inline-block; margin: 6px 0 14px;
+  }
+  .big { font-size: 40px; line-height: 1; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="text"><h1 id="title">Japri Setup</h1><p id="subtitle"></p></div>
+  <div class="logo" aria-hidden="true">J</div>
+</header>
+<main id="content"><p><span class="spin"></span>Memuat…</p></main>
+<footer>
+  <div class="step" id="stepText"></div>
+  <button id="back">&lt; Kembali</button>
+  <button id="next" class="primary">Lanjut &gt;</button>
+  <button id="cancel">Batal</button>
+</footer>
+
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.search).get("t");
+const $ = (sel) => document.querySelector(sel);
+const content = $("#content"), backBtn = $("#back"), nextBtn = $("#next"), cancelBtn = $("#cancel");
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "x-japri-token": TOKEN, "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error " + res.status);
+  return data;
+}
+const openLink = (url) => api("/api/open", { url }).catch(() => {});
+
+/** Bikin elemen: h("p", {class: "x"}, "teks", anak...). Teks selalu lewat textContent (aman). */
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of children.flat()) if (c != null && c !== false) el.append(c instanceof Node ? c : String(c));
+  return el;
+}
+
+// ---------- State ----------
+let init;              // data dari /api/init
+const s = {            // isian user
+  provider: "", baseUrl: "", apiKey: "", model: "", manualModel: "",
+  botName: "Japri", timezone: "Asia/Jakarta", otherTz: "",
+  testFailed: null,    // pesan error tes terakhir (buat model yang sama)
+};
+let models = { forKey: "", list: [], error: "" };
+let busy = false;
+let waTimer = null;
+
+const preset = () => init.providers.find((p) => p.id === s.provider);
+const keepsOldKey = () => !!init.current && init.current.provider === s.provider && init.current.hasKey;
+const chosenModel = () => s.manualModel.trim() || s.model;
+
+const STEPS = ["welcome", "provider", "connection", "model", "bot", "whatsapp", "done"];
+let step = 0;
+const visibleSteps = () => STEPS.filter((st) => st !== "connection" || !preset() || preset().needsBaseUrl || preset().asksApiKey);
+
+// ---------- Langkah-langkah ----------
+const views = {
+  welcome: {
+    title: "Selamat datang di Setup Japri",
+    subtitle: "Asisten pribadi buat grup WhatsApp lo.",
+    render() {
+      return [
+        h("p", {}, "Setup ini bakal nyiapin Japri dalam beberapa langkah. Siapin dulu:"),
+        h("ol", {},
+          h("li", {}, h("b", {}, "API key"), " dari salah satu penyedia AI (atau model lokal kayak Ollama)."),
+          h("li", {}, "HP dengan ", h("b", {}, "nomor WhatsApp khusus buat bot"), ", bukan nomor pribadi lo."),
+          h("li", {}, "WhatsApp pribadi lo, buat daftar jadi owner Japri."),
+        ),
+        init.current && h("div", { class: "note" }, "Pengaturan lama ketemu. Isinya dipakai jadi pilihan awal, tinggal ganti yang perlu."),
+        h("p", { class: "muted" }, "Klik Lanjut buat mulai."),
+      ];
+    },
+  },
+
+  provider: {
+    title: "Pilih AI",
+    subtitle: "AI yang dipakai Japri buat ngerti & bales pesan.",
+    render() {
+      return h("div", { class: "choices" }, init.providers.map((p) =>
+        h("label", { class: "choice" },
+          h("input", {
+            type: "radio", name: "provider", value: p.id, checked: s.provider === p.id,
+            onchange: () => { s.provider = p.id; s.baseUrl = defaultBaseUrl(); s.apiKey = ""; s.model = ""; s.manualModel = ""; update(); },
+          }),
+          p.label,
+        )));
+    },
+    valid: () => !!s.provider,
+  },
+
+  connection: {
+    get title() { return "Sambungin ke " + preset().label.replace(/ \(.*\)$/, ""); },
+    subtitle: "Data ini cuma disimpan di komputer lo.",
+    render() {
+      const p = preset();
+      const out = [];
+      if (p.needsBaseUrl) {
+        out.push(h("label", { class: "field" }, h("span", {}, "Alamat server (base URL)"),
+          h("input", { type: "text", id: "baseUrl", value: s.baseUrl, spellcheck: "false", oninput: (e) => { s.baseUrl = e.target.value; update(); } })));
+      }
+      if (p.asksApiKey) {
+        const keep = keepsOldKey();
+        out.push(h("label", { class: "field" },
+          h("span", {}, p.needsKey ? "API key" : "API key (kosongin kalau gak perlu)"),
+          h("input", {
+            type: "password", id: "apiKey", value: s.apiKey, spellcheck: "false", autocomplete: "off",
+            placeholder: keep ? "Kosongin buat pakai API key yang lama" : "",
+            oninput: (e) => { s.apiKey = e.target.value; update(); },
+          })));
+        if (p.keyHelp) {
+          out.push(h("p", { class: "muted" }, "Belum punya? ",
+            h("button", { class: "link", onclick: () => openLink(p.keyHelp) }, "Bikin API key di " + new URL(p.keyHelp).host + " ↗")));
+        }
+      }
+      return out;
+    },
+    valid() {
+      const p = preset();
+      if (p.needsBaseUrl && !/^https?:\/\/\S+$/.test(s.baseUrl.trim())) return false;
+      if (p.needsKey && !keepsOldKey() && s.apiKey.trim().length <= 10) return false;
+      return true;
+    },
+  },
+
+  model: {
+    title: "Pilih model",
+    subtitle: "Model AI yang dipakai Japri. Bisa diganti kapan aja.",
+    render() {
+      const key = JSON.stringify([s.provider, s.baseUrl, s.apiKey]);
+      if (models.forKey !== key) {
+        models = { forKey: key, list: null, error: "" };
+        api("/api/models", llmBody()).then(
+          (r) => { if (models.forKey === key) { models.list = r.models; models.error = r.error || ""; renderStep(); } },
+          (e) => { if (models.forKey === key) { models.list = []; models.error = e.message; renderStep(); } },
+        );
+      }
+      if (models.list === null) return h("p", {}, h("span", { class: "spin" }), "Ngambil daftar model…");
+
+      const out = [];
+      if (models.list.length) {
+        const labels = s.provider === "anthropic" ? Object.fromEntries(init.anthropicModels.map((m) => [m.id, m.label])) : {};
+        if (!s.model && init.current?.provider === s.provider && models.list.includes(init.current.model)) s.model = init.current.model;
+        if (!s.model && s.provider === "anthropic") s.model = models.list[0];
+        // Model lama yang gak ada di daftar: tampilin di kotak "ketik manual" biar gak nyumput
+        if (s.model && !s.manualModel && !models.list.includes(s.model)) { s.manualModel = s.model; s.model = ""; }
+        const list = h("select", { size: 9, id: "modelList", onchange: (e) => { s.model = e.target.value; s.manualModel = ""; manual.value = ""; s.testFailed = null; update(); } });
+        const fill = (term) => {
+          list.replaceChildren(...models.list
+            .filter((m) => !term || m.toLowerCase().includes(term.toLowerCase()) || (labels[m] || "").toLowerCase().includes(term.toLowerCase()))
+            .map((m) => h("option", { value: m, selected: m === s.model }, labels[m] || m)));
+        };
+        fill("");
+        if (models.list.length > 9) {
+          out.push(h("label", { class: "field" }, h("span", {}, `Cari model (${models.list.length} tersedia)`),
+            h("input", { type: "text", placeholder: s.provider === "openrouter" ? "mis. haiku, atau :free buat model gratis" : "Ketik buat nyari", spellcheck: "false", oninput: (e) => fill(e.target.value) })));
+        }
+        out.push(list);
+      } else {
+        const why = models.error ? ": " + models.error.replace(/\.+$/, "") : "";
+        out.push(h("div", { class: "note" }, "Daftar model gak bisa diambil" + why + ". Ketik nama modelnya manual di bawah."));
+      }
+      const manual = h("input", {
+        type: "text", id: "manualModel", value: s.manualModel || (models.list.length ? "" : s.model), spellcheck: "false",
+        placeholder: s.provider === "ollama" ? "cek pakai `ollama list`" : "",
+        oninput: (e) => { s.manualModel = e.target.value; s.testFailed = null; update(); },
+      });
+      out.push(h("label", { class: "field", style: "margin-top:14px" }, h("span", {}, models.list.length ? "Atau ketik nama model lain" : "Nama model"), manual));
+      if (s.testFailed) {
+        out.push(h("div", { class: "error" }, h("b", {}, "Tes gagal: "), s.testFailed));
+        out.push(h("p", { class: "muted" }, "Coba model lain, cek lagi API key-nya, atau ",
+          h("button", { class: "link", onclick: () => { s.skipTest = true; go(1); } }, "simpan aja"), " (Japri mungkin gak jalan bener)."));
+      }
+      return out;
+    },
+    valid: () => !!chosenModel(),
+    async beforeNext() {
+      content.replaceChildren(h("p", {}, h("span", { class: "spin" }), "Ngetes koneksi & kemampuan tool calling…"),
+        h("p", { class: "muted" }, "Biasanya beberapa detik."));
+      const r = await api("/api/test", llmBody()).catch((e) => ({ ok: false, detail: e.message }));
+      if (r.ok) { s.testFailed = null; return true; }
+      s.testFailed = r.detail;
+      return false;
+    },
+  },
+
+  bot: {
+    title: "Nama & zona waktu",
+    subtitle: "Biar Japri kenal dirinya, dan tau jam di tempat lo.",
+    render() {
+      const known = init.timezones.some((t) => t.value === s.timezone);
+      const tzSelect = h("select", { id: "tz", onchange: (e) => { s.timezone = e.target.value === "__other" ? "" : e.target.value; renderStep(); } },
+        init.timezones.map((t) => h("option", { value: t.value, selected: known && t.value === s.timezone }, t.name)),
+        h("option", { value: "__other", selected: !known }, "Lainnya…"));
+      return [
+        h("label", { class: "field" }, h("span", {}, "Nama bot"),
+          h("input", { type: "text", id: "botName", value: s.botName, oninput: (e) => { s.botName = e.target.value; update(); } })),
+        h("label", { class: "field" }, h("span", {}, "Zona waktu"), tzSelect),
+        !known && h("label", { class: "field" }, h("span", {}, "Zona waktu (format IANA, mis. Asia/Singapore)"),
+          h("input", { type: "text", id: "otherTz", value: s.timezone, spellcheck: "false", oninput: (e) => { s.timezone = e.target.value.trim(); update(); } })),
+        s.saveError && h("div", { class: "error" }, s.saveError),
+      ];
+    },
+    valid: () => !!s.botName.trim() && !!s.timezone,
+    async beforeNext() {
+      try {
+        await api("/api/save", { ...llmBody(), botName: s.botName, timezone: s.timezone });
+        s.saveError = "";
+        return true;
+      } catch (e) {
+        s.saveError = e.message;
+        return false;
+      }
+    },
+  },
+
+  whatsapp: {
+    title: "Sambungin WhatsApp",
+    subtitle: "Tautkan nomor bot, terus daftarin diri lo jadi owner.",
+    render() {
+      pollWa();
+      const wa = s.wa;
+      if (!wa || wa.status === "connecting") return h("p", {}, h("span", { class: "spin" }), "Nyambung ke WhatsApp…");
+      if (wa.status === "qr" && wa.qr) {
+        return [
+          h("div", { class: "qr" },
+            h("ol", {},
+              h("li", {}, "Buka WhatsApp di HP ", h("b", {}, "nomor bot"), " (bukan nomor pribadi lo)."),
+              h("li", {}, "Ketuk ⋮ atau Pengaturan → ", h("b", {}, "Perangkat tertaut"), "."),
+              h("li", {}, "Ketuk ", h("b", {}, "Tautkan perangkat"), ", terus scan kode di samping."),
+            ),
+            h("img", { src: wa.qr, alt: "QR code WhatsApp" })),
+          h("p", { class: "muted" }, "Kode ini ganti tiap beberapa detik dan otomatis ke-update."),
+        ];
+      }
+      return [
+        h("p", {}, "✅ WhatsApp nomor bot udah nyambung", wa.bot ? " (wa.me/" + wa.bot + ")." : "."),
+        h("h2", {}, "Satu langkah lagi: daftar jadi owner"),
+        h("p", {}, "Dari WhatsApp ", h("b", {}, "pribadi"), " lo, kirim kode ini ke nomor bot:"),
+        h("div", { class: "code" }, wa.setupCode),
+        h("p", {}, wa.waLink && h("button", { onclick: () => openLink(wa.waLink) }, "Buka WhatsApp & kirim kode ↗")),
+        h("p", { class: "muted" }, h("span", { class: "spin" }), "Nunggu kodenya masuk…"),
+      ];
+    },
+    valid: () => false, // lanjut sendiri pas owner udah terdaftar
+  },
+
+  done: {
+    title: "Setup selesai",
+    subtitle: "Japri siap dipakai.",
+    render() {
+      return [
+        h("div", { class: "big" }, "🎉"),
+        h("p", {}, "Japri udah jalan. Coba chat nomor bot dari WhatsApp lo, misalnya ", h("i", {}, "\"gue ketinggalan apa?\""), "."),
+        h("p", {}, "Masukin nomor bot ke grup-grup lo biar Japri bisa ngabarin & ngerangkum."),
+        h("p", { class: "muted" }, "Jendela Japri boleh ditutup kapan aja: Japri tetap jalan di system tray (ikon deket jam)."),
+      ];
+    },
+    valid: () => true,
+  },
+};
+
+function defaultBaseUrl() {
+  const p = preset();
+  if (init.current && init.current.provider === s.provider && init.current.baseUrl) return init.current.baseUrl;
+  return p?.baseUrl || "";
+}
+
+function llmBody() {
+  return { provider: s.provider, baseUrl: s.baseUrl, apiKey: s.apiKey, model: chosenModel() };
+}
+
+function pollWa() {
+  if (waTimer) return;
+  const tick = async () => {
+    try {
+      s.wa = await api("/api/wa");
+    } catch { /* coba lagi */ }
+    if (STEPS[step] !== "whatsapp") { waTimer = null; return; }
+    if (s.wa && s.wa.status === "ready" && s.wa.ownerClaimed) { waTimer = null; step = STEPS.indexOf("done"); renderStep(); return; }
+    const sig = JSON.stringify([s.wa?.status, s.wa?.qr, s.wa?.bot]);
+    if (sig !== s.waSig) { s.waSig = sig; renderStep(); }
+    waTimer = setTimeout(tick, 1500);
+  };
+  waTimer = setTimeout(tick, 0);
+}
+
+// ---------- Navigasi ----------
+function update() {
+  const name = STEPS[step];
+  const vis = visibleSteps();
+  $("#stepText").textContent = name === "done" ? "" : `Langkah ${vis.indexOf(name) + 1} dari ${vis.length - 1}`;
+  backBtn.classList.toggle("hidden", name === "welcome" || name === "done" || (init.pairOnly && name === "whatsapp"));
+  cancelBtn.classList.toggle("hidden", name === "done");
+  nextBtn.classList.toggle("hidden", name === "whatsapp");
+  nextBtn.textContent = name === "done" ? "Selesai" : "Lanjut >";
+  nextBtn.disabled = busy || !(views[name].valid ? views[name].valid() : true);
+  backBtn.disabled = cancelBtn.disabled = busy;
+}
+
+function renderStep() {
+  const v = views[STEPS[step]];
+  $("#title").textContent = v.title;
+  $("#subtitle").textContent = v.subtitle;
+  content.replaceChildren(...[v.render()].flat().filter(Boolean));
+  update();
+  content.querySelector("input:not([type=radio]), select, input:checked")?.focus();
+}
+
+async function go(dir) {
+  if (busy) return;
+  const name = STEPS[step];
+  if (dir > 0 && name === "done") {
+    nextBtn.disabled = true;
+    await api("/api/finish", {}).catch(() => {});
+    return;
+  }
+  if (dir > 0 && views[name].beforeNext) {
+    // "simpan aja" setelah tes gagal: lewati tes sekali ini
+    const skipTest = name === "model" && s.skipTest;
+    s.skipTest = false;
+    if (!skipTest) {
+      busy = true; update();
+      const ok = await views[name].beforeNext();
+      busy = false;
+      if (!ok) { renderStep(); return; }
+    }
+  }
+  const vis = visibleSteps();
+  step = STEPS.indexOf(vis[vis.indexOf(name) + dir]);
+  renderStep();
+}
+
+backBtn.addEventListener("click", () => go(-1));
+nextBtn.addEventListener("click", () => go(1));
+cancelBtn.addEventListener("click", async () => {
+  if (!confirm("Batalin setup Japri?\nPengaturan yang belum disimpan bakal hilang.")) return;
+  await api("/api/cancel", {}).catch(() => {});
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !nextBtn.disabled && !nextBtn.classList.contains("hidden") && e.target.tagName !== "BUTTON") {
+    e.preventDefault();
+    go(1);
+  }
+});
+
+(async () => {
+  try {
+    init = await api("/api/init");
+  } catch (e) {
+    content.replaceChildren(h("div", { class: "error" }, "Gagal memuat setup: " + e.message));
+    return;
+  }
+  const c = init.current;
+  if (c) Object.assign(s, { provider: c.provider, baseUrl: c.baseUrl || "", model: c.model, botName: c.botName || "Japri", timezone: c.timezone || "Asia/Jakarta" });
+  if (!s.baseUrl) s.baseUrl = defaultBaseUrl();
+  step = init.pairOnly ? STEPS.indexOf("whatsapp") : 0;
+  renderStep();
+})();
+</script>
+</body>
+</html>

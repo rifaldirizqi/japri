@@ -1,7 +1,8 @@
 import { configExists, loadConfig } from "./config.js";
-import { handleMessage, hasOwner, introduceToGroup, pairingInfo, whenOwnerClaimed } from "./bot.js";
+import { handleMessage, hasOwner, introduceToGroup, pairingInfo, setupCode, whenOwnerClaimed } from "./bot.js";
 import { acquireSingleInstanceLock, isDesktop, reportInfo } from "./desktop.js";
 import { startScheduler } from "./scheduler.js";
+import { startSetupServer } from "./setup/web.js";
 import { runWizard } from "./setup/wizard.js";
 import { botNumber, connect } from "./wa/client.js";
 
@@ -11,6 +12,8 @@ import { botNumber, connect } from "./wa/client.js";
 const pairOnly = process.argv[2] === "pair";
 const setupOnly = process.argv[2] === "setup" || pairOnly;
 const interactive = process.stdin.isTTY;
+// Japri.exe (Windows): setup lewat jendela wizard (setup/wizard.html), bukan terminal
+const webSetup = isDesktop && setupOnly && process.env.JAPRI_SETUP_UI === "web";
 
 async function waitForConfig() {
   console.log(
@@ -35,7 +38,16 @@ if (isDesktop && !acquireSingleInstanceLock()) {
   process.exit(2);
 }
 
-if ((setupOnly && !pairOnly) || !configExists()) {
+if (webSetup) {
+  const wizard = await startSetupServer({
+    pairOnly,
+    pairing: () => ({ bot: botNumber() || undefined, ownerClaimed: hasOwner(), setupCode }),
+    onFinish: () => process.exit(0),
+    onCancel: () => process.exit(0),
+  });
+  process.stdout.write(`@@japri-setup-url ${wizard.url}\n`); // dibaca Japri.exe, terus dibuka di jendela setup
+  await wizard.saved;
+} else if ((setupOnly && !pairOnly) || !configExists()) {
   if (interactive) {
     await runWizard().catch((e) => {
       if (e instanceof Error && e.name === "ExitPromptError") {
@@ -73,6 +85,7 @@ whenOwnerClaimed(() => {
 });
 
 function finishSetup() {
+  if (webSetup) return; // jendela wizard yang nampilin "selesai"; keluarnya pas user klik Selesai
   if (isDesktop) {
     console.log("\n🎉 Setup selesai! Jendela ini bakal ketutup sendiri, terus jendela Japri kebuka.");
     console.log("   Jendela Japri boleh ditutup kapan aja: Japri tetap jalan di system tray (pojok kanan bawah).\n");

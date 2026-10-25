@@ -19,7 +19,7 @@ import qrcode from "qrcode-terminal";
 import fs from "node:fs";
 import { AUTH_DIR } from "../config.js";
 import * as store from "../db.js";
-import { isDesktop, isTray, markConnected, reportStatus, showQrInBrowser } from "../desktop.js";
+import { isDesktop, isTray, markConnected, reportStatus, setupWizardOpen, showQrInBrowser } from "../desktop.js";
 
 export type IncomingMessage = {
   raw: WAMessage;
@@ -189,13 +189,16 @@ export async function connect(handlers: Handlers) {
       reportStatus("qr");
       if (isDesktop) {
         await showQrInBrowser(qr).catch((e) => console.error("Gagal buka QR di browser:", e));
-        console.log("\n📱 QR buat nyambungin WhatsApp udah kebuka di browser. Scan pakai HP nomor BOT.");
-        console.log("   (Kalau browsernya gak kebuka, scan QR di bawah ini.)\n");
+        if (!setupWizardOpen()) {
+          console.log("\n📱 QR buat nyambungin WhatsApp udah kebuka di browser. Scan pakai HP nomor BOT.");
+          console.log("   (Kalau browsernya gak kebuka, scan QR di bawah ini.)\n");
+        }
       } else {
         console.log("\n📱 Scan QR ini pakai HP nomor BOT:");
         console.log("   WhatsApp → ⋮ / Pengaturan → Perangkat tertaut → Tautkan perangkat\n");
       }
-      if (!isTray) qrcode.generate(qr, { small: true });
+      // Jendela setup udah nampilin QR-nya sendiri
+      if (!isTray && !setupWizardOpen()) qrcode.generate(qr, { small: true });
     }
     if (connection === "open") {
       retryDelay = 3000;

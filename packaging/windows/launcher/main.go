@@ -14,8 +14,9 @@
 //     sembunyi ke tray. Bot-nya (node) jalan di belakang tanpa jendela, output-nya ditulis ke
 //     japri.log + ditampilin di jendela, dan dinyalain ulang sendiri kalau crash.
 //   - Japri.exe --tray (autostart) langsung ke tray tanpa buka jendela.
-//   - Setup (wizard, scan QR, klaim owner) butuh tempat ngetik, jadi dijalanin di jendela console
-//     terpisah: Japri.exe manggil dirinya sendiri pakai argumen "__console".
+//   - Setup (wizard, scan QR, klaim owner) dijalanin di jendela setup terpisah (halaman wizard dari
+//     Japri di jendela WebView2): Japri.exe manggil dirinya sendiri pakai argumen "__setup".
+//     Kalau WebView2 gak ada, pakai jendela console ("__console").
 //   - Cuma satu Japri yang boleh jalan. Kalau dibuka lagi, yang lama dikabarin lewat pesan window.
 package main
 
@@ -106,12 +107,15 @@ func main() {
 	if len(os.Args) > 1 {
 		arg = os.Args[1]
 	}
-	if arg == "__console" {
+	if arg == "__setup" || arg == "__console" {
 		mode := ""
 		if len(os.Args) > 2 {
 			mode = os.Args[2]
 		}
-		os.Exit(runConsole(p, mode))
+		if arg == "__console" {
+			os.Exit(runConsole(p, mode))
+		}
+		os.Exit(runSetup(p, mode))
 	}
 
 	// Satu Japri aja. Kalau udah ada, kabarin yang lama (dia yang nampilin notifikasi / buka setup).

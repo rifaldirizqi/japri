@@ -12,8 +12,19 @@ export const isTray = !!process.env.JAPRI_TRAY;
 
 export type Status = "connecting" | "qr" | "ready";
 
+type SetupWizardSink = { status(status: Status): void; qr(dataUrl: string): void };
+let setupWizard: SetupWizardSink | null = null;
+
+/** Wizard setup di jendela Japri lagi kebuka: status & QR WhatsApp dikirim ke situ, gak dibuka di browser. */
+export function sendToSetupWizard(sink: SetupWizardSink) {
+  setupWizard = sink;
+}
+
+export const setupWizardOpen = () => setupWizard !== null;
+
 /** Kabarin jendela & ikon tray (dibaca Japri.exe; baris ini gak ikut ke log). */
 export function reportStatus(status: Status) {
+  setupWizard?.status(status);
   if (isTray) process.stdout.write(`@@japri-status ${status}\n`);
 }
 
@@ -25,7 +36,8 @@ export function reportInfo(info: { bot?: string; ai?: string }) {
 const QR_PAGE = path.join(DATA_DIR, "qr.html");
 const LOCK_FILE = path.join(DATA_DIR, "japri.lock");
 
-function openInBrowser(file: string) {
+/** Buka file atau link di browser default. */
+export function openInBrowser(file: string) {
   const [cmd, args] =
     process.platform === "win32"
       ? ["cmd", ["/c", "start", '""', `"${file}"`]]
@@ -57,6 +69,10 @@ let qrOpened = false;
 /** Tulis QR ke halaman HTML (auto-refresh), dan buka di browser pas pertama kali. */
 export async function showQrInBrowser(qr: string) {
   const dataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 560 });
+  if (setupWizard) {
+    setupWizard.qr(dataUrl);
+    return;
+  }
   fs.writeFileSync(
     QR_PAGE,
     page(

@@ -1,7 +1,7 @@
 package main
 
-// Jendela console buat setup (wizard API key, scan QR, klaim owner).
-// Jalan sebagai proses terpisah (Japri.exe __console <mode>), jadi kalau jendelanya ditutup,
+// Jendela console buat setup (wizard API key, scan QR, klaim owner): cadangan kalau jendela setup
+// WebView2 (setup.go) gak bisa dibuka. Jalan sebagai proses terpisah, jadi kalau jendelanya ditutup,
 // ikon tray-nya tetap aman.
 
 import (
