@@ -188,6 +188,8 @@ Shortcut di Desktop, Start Menu, dan autostart ikut kehapus otomatis.
 
 Bot ini pakai [Baileys](https://github.com/WhiskeySockets/Baileys), library yang niru WhatsApp Web. Ini **bukan API resmi WhatsApp**, jadi ada risiko nomor bot di-ban. Pakai nomor khusus, jangan dipakai buat spam/broadcast, dan kasih tau anggota grup kalau ada bot pencatat.
 
+Japri gak berafiliasi dengan WhatsApp atau Meta.
+
 ---
 
 ## Buat developer
@@ -235,4 +237,6 @@ docs/REQUIREMENTS*.md     requirement & scope tiap versi
 
 ## Lisensi
 
-[MIT](LICENSE)
+Kode Japri berlisensi [MIT](LICENSE).
+
+Installer Windows dan image Docker juga berisi komponen pihak ketiga dengan lisensinya masing-masing, termasuk [libsignal](https://github.com/WhiskeySockets/libsignal-node) (dipakai Baileys) yang berlisensi GPL-3.0. Daftar dan teks lisensinya ada di [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).

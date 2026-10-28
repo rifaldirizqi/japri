@@ -56,6 +56,7 @@ Name: "autostart"; Description: "Jalankan Japri otomatis tiap Windows nyala (dis
 [Files]
 Source: "{#Stage}\Japri.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "japri.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\THIRD_PARTY_NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Stage}\node\*"; DestDir: "{app}\node"; Flags: ignoreversion recursesubdirs
 ; Folder app di-replace total tiap update biar gak ada file lama nyangkut
 Source: "{#Stage}\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubdirs createallsubdirs

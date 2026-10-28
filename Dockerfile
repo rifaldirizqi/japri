@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 # --omit=peer: buang sharp (cuma buat thumbnail media, di-load opsional sama Baileys)
 RUN npm ci --omit=dev --omit=peer
-COPY tsconfig.json ./
+COPY tsconfig.json LICENSE THIRD_PARTY_NOTICES.txt ./
 COPY src ./src
 
 ENV NODE_ENV=production \
