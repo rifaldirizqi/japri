@@ -20,9 +20,18 @@ Japri pakai **nomor WhatsApp kedua** yang lo invite ke grup-grup lo. Dia nyatet 
 | 🔕 **Atur notif** | _"matiin notif grup alumni"_ · _"grup kantor cuma kalau di-tag"_ · _"jangan ganggu jam 10 malam sampai 6 pagi"_ (notif ditahan, dikirim jadi satu pesan pas pagi) |
 | ⏰ **Reminder** | _"ingetin gue besok jam 9 kirim laporan"_ · _"tiap senin jam 8 ingetin grup tim soal standup"_ |
 | ⚙️ **Atur lewat chat** | _"panggil gue andi atau ndi"_ · _"zona waktu gue WITA"_ · _"ganti nama lo jadi Jarvis"_ |
+| 💬 **Jawab anggota grup** (opsional) | _"jawab semua orang di grup kantor"_ → anggota grup bisa nanya apa aja ke bot (tag bot, bales pesannya, atau awali dengan `/ai`). Pakai AI terpisah yang gak bisa baca catatan grup, dan provider/API key-nya bisa beda dari punya lo. Default mati. |
 | 🆕 **Kabar update** | Ada versi Japri baru → lo di-DM, lengkap sama isi perubahan. Di Windows, bales *update* dan Japri update sendiri. Bisa juga nanya _"ada update gak?"_ |
 
-Cuma lo yang bisa merintah bot. Orang lain yang nge-DM atau nge-tag bot dicuekin.
+Cuma lo yang bisa merintah bot. Orang lain yang nge-DM bot dicuekin. Tag dari anggota grup juga dicuekin, kecuali lo nyalain **jawab anggota grup** buat grup itu. Itu pun mereka cuma dapet AI umum buat tanya jawab: gak bisa baca catatan grup, ngerangkum, bikin reminder, atau ngubah pengaturan.
+
+### Jawab anggota grup
+
+1. **Atur AI-nya dulu.** Windows: **Pengaturan** → **AI buat anggota** (pilih penyedia, API key, dan model, terus **Tes & simpan**). Docker/Node: bilang ke bot _"AI anggota pakai model X"_ (pakai penyedia & API key lo), atau jalanin setup lagi kalau mau penyedia/API key lain. API key jangan pernah diketik di chat.
+2. **Nyalain:** _"jawab semua orang di grup kantor"_ atau _"jawab semua orang di semua grup"_. Grup yang baru nyala dapet pengumuman sekali.
+3. **Pantau:** _"AI anggota kepake berapa minggu ini?"_. Kalau perlu, kasih jatah: _"batasi AI anggota 20 pertanyaan per orang sehari"_. Default tanpa batas.
+
+AI anggota gak pakai tool, jadi model murah, gratis (OpenRouter `:free`), atau lokal (Ollama) juga bisa. Biayanya ditanggung API key yang lo pasang. Biar nomor bot gak dianggap spam, Japri ngasih jeda beberapa detik antar balasan di grup yang sama, tapi tetap hati-hati nyalain ini di grup yang rame banget.
 
 ## Yang perlu disiapin
 
@@ -57,7 +66,7 @@ Kalau tadi opsi _"Jalankan otomatis"_ dicentang, Japri nyala sendiri tiap Window
 
 Kalau bot-nya crash, Japri nyalain ulang sendiri. Klik kanan ikon tray buat menu cepat: **Buka Japri**, **Pengaturan**, **Buka folder data**, **Keluar**.
 
-**Pengaturan** (tombol di jendela Japri, menu tray, atau Start Menu → Japri - Pengaturan): ganti AI & API key, nama bot, nama panggilan, zona waktu, jam tenang, rangkuman otomatis, notif & baca gambar per grup, dan lainnya. Perubahan langsung kepakai tanpa restart. Mau sambungin ulang dari awal (mis. ganti nomor bot)? Pengaturan → Tentang → **Setup ulang**.
+**Pengaturan** (tombol di jendela Japri, menu tray, atau Start Menu → Japri - Pengaturan): ganti AI & API key, AI buat anggota grup, nama bot, nama panggilan, zona waktu, jam tenang, rangkuman otomatis, notif & baca gambar per grup, dan lainnya. Perubahan langsung kepakai tanpa restart. Mau sambungin ulang dari awal (mis. ganti nomor bot)? Pengaturan → Tentang → **Setup ulang**.
 
 ### Cara B — Docker
 
@@ -138,6 +147,7 @@ Mau ganti model? Bilang aja ke bot: _"ganti model ke claude-sonnet-5-5"_. Kalau 
 - Semua data (pesan grup, reminder, pengaturan, session WhatsApp) disimpan di folder `data/` **di komputer lo sendiri**. Di versi installer Windows, letaknya di `%LOCALAPPDATA%\Japri\data`.
 - Isi grup cuma dikirim ke provider AI pas lo minta rangkuman, nyari pesan, atau digest lo nyala. Selain itu, pesan yang ditujuin ke lo (tag, reply, nama panggilan) dikirim satu-satu buat dicek isinya tugas atau bukan; bisa dimatiin pakai _"matiin saran reminder"_.
 - **Gambar** cuma dikirim ke AI kalau lo nyalain fitur baca gambar. File gambarnya gak disimpan, cuma catatan teksnya.
+- **Jawab anggota grup**: kalau lo nyalain, pertanyaan anggota (plus pesan yang mereka bales) dikirim ke penyedia AI anggota. Isi catatan grup gak pernah ikut dikirim. Pengumuman di grup dan intro bot nyebut ini.
 - Pesan grup otomatis dihapus setelah 30 hari. Bisa diubah: _"simpan pesan 7 hari aja"_.
 - Pas masuk grup, bot ngenalin diri. **Admin grup** bisa ketik `@NamaBot keluar` atau kick bot, dan semua catatan grup itu langsung dihapus.
 - Folder `data/` isinya API key dan session WhatsApp. Jangan di-share atau di-upload ke mana-mana.
@@ -148,6 +158,7 @@ Mau ganti model? Bilang aja ke bot: _"ganti model ke claude-sonnet-5-5"_. Kalau 
 |---|---|---|---|
 | Lihat log | buka jendela Japri (log ada di bawah). Log lengkap: file `japri.log` di folder data | `docker compose logs -f` | lihat terminal / `pm2 logs` |
 | Ganti provider / API key | jendela Japri → **Pengaturan** → AI | `docker compose run --rm japri setup` → `docker compose up -d` | `npm run setup` |
+| Ganti AI buat anggota grup | jendela Japri → **Pengaturan** → AI buat anggota | penyedia lo: bilang _"AI anggota pakai model X"_. Penyedia/key lain: setup ulang kayak di atas | sama kayak Docker |
 | Update ke versi baru | bales *update* ke kabar versi baru dari Japri (atau jalanin installer versi baru; data tetap aman) | `docker compose pull && docker compose up -d` | `git pull && npm install`, terus restart |
 | Matiin kabar update | bilang ke bot: _"matiin cek update"_ | sama | sama |
 | Berhentiin bot | jendela Japri → **Keluar** (nutup jendela doang gak matiin bot) | `docker compose down` | Ctrl+C / `pm2 stop japri` |
@@ -188,7 +199,7 @@ Shortcut di Desktop, Start Menu, dan autostart ikut kehapus otomatis.
 
 ## ⚠️ Penting
 
-Bot ini pakai [Baileys](https://github.com/WhiskeySockets/Baileys), library yang niru WhatsApp Web. Ini **bukan API resmi WhatsApp**, jadi ada risiko nomor bot di-ban. Pakai nomor khusus, jangan dipakai buat spam/broadcast, dan kasih tau anggota grup kalau ada bot pencatat.
+Bot ini pakai [Baileys](https://github.com/WhiskeySockets/Baileys), library yang niru WhatsApp Web. Ini **bukan API resmi WhatsApp**, jadi ada risiko nomor bot di-ban. Pakai nomor khusus, jangan dipakai buat spam/broadcast, dan kasih tau anggota grup kalau ada bot pencatat. Bot yang aktif ngebales di grup rame (fitur jawab anggota grup) lebih rawan ditandai spam.
 
 Japri gak berafiliasi dengan WhatsApp atau Meta.
 

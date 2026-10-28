@@ -70,3 +70,19 @@ export async function testToolCalling(cfg: LLMConfig): Promise<{ ok: boolean; de
     return { ok: false, detail: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/** Cek model bisa dihubungi dan ngejawab (buat AI anggota, yang gak pakai tool). */
+export async function testReply(cfg: LLMConfig): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const reply = await createLLM(cfg).run({
+      system: "Balas HANYA dengan kata: siap",
+      history: [{ role: "user", text: "Tes koneksi." }],
+      tools: [],
+      maxIterations: 1,
+    });
+    if (!reply.trim()) return { ok: false, detail: "Model bisa dihubungi tapi gak ngasih jawaban." };
+    return { ok: true, detail: "Koneksi oke" };
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+}

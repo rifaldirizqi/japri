@@ -1,11 +1,13 @@
 // Jendela Pengaturan (Windows): halaman settings.html yang disajiin proses bot yang lagi jalan, jadi
 // perubahan langsung kepakai tanpa restart. Ditampilin Japri.exe di jendela WebView2.
 import fs from "node:fs";
-import { loadConfig, updateConfig, type Config } from "../config.js";
+import { wantsMemberReplies } from "../agent/member.js";
+import { loadConfig, updateConfig, type Config, type LLMConfig } from "../config.js";
 import * as store from "../db.js";
 import { DAY_NAMES } from "../digest.js";
 import { ANTHROPIC_MODELS } from "../llm/anthropic.js";
 import * as settings from "../settings.js";
+import { localDate, nowTs } from "../time.js";
 import { currentVersion } from "../updater.js";
 import { providerList, startLocalServer, str, toLLM, type Body } from "./local-server.js";
 import { TIMEZONES } from "./wizard.js";
@@ -20,8 +22,13 @@ export interface SettingsServerOptions {
   onResetup: () => void;
 }
 
+// API key gak pernah dikirim ke halaman, cuma "ada / gak ada"
+const publicLLM = (llm: LLMConfig) => ({ provider: llm.provider, model: llm.model, baseUrl: llm.baseUrl, hasKey: !!llm.apiKey });
+
 function state(opts: SettingsServerOptions) {
   const c = loadConfig();
+  const m = c.memberReplies;
+  const usage = new Map(store.memberUsageSince(localDate(nowTs() - 6 * 86400, c.timezone)).map((u) => [u.chat_jid, u.count]));
   return {
     version: currentVersion,
     bot: opts.botNumber() || null,
@@ -30,8 +37,7 @@ function state(opts: SettingsServerOptions) {
     timezones: TIMEZONES.filter((t) => t.value !== "__other"),
     days: DAY_NAMES,
     config: {
-      // API key gak pernah dikirim ke halaman, cuma "ada / gak ada"
-      llm: { provider: c.llm.provider, model: c.llm.model, baseUrl: c.llm.baseUrl, hasKey: !!c.llm.apiKey },
+      llm: publicLLM(c.llm),
       botName: c.botName,
       nicknames: c.nicknames,
       timezone: c.timezone,
@@ -42,8 +48,17 @@ function state(opts: SettingsServerOptions) {
       taskOffers: c.taskOffers,
       readImages: c.readImages,
       checkUpdates: c.checkUpdates,
+      members: { llm: m.llm && publicLLM(m.llm), enabled: m.enabled, perPersonDaily: m.perPersonDaily, perGroupDaily: m.perGroupDaily },
     },
-    groups: store.listGroups().map((g) => ({ jid: g.jid, name: g.name, notify: g.notify_mode, readImages: g.read_images })),
+    groups: store.listGroups().map((g) => ({
+      jid: g.jid,
+      name: g.name,
+      notify: g.notify_mode,
+      readImages: g.read_images,
+      members: g.member_replies,
+      membersOn: wantsMemberReplies(g),
+      memberUsage: usage.get(g.jid) ?? 0,
+    })),
   };
 }
 
@@ -101,6 +116,23 @@ export async function startSettingsServer(opts: SettingsServerOptions) {
         const rejected = await settings.setLLM(toLLM(body), body.skipTest === true);
         return rejected ? { status: 400, body: { error: rejected } } : { body: state(opts) };
       }
+      case "POST /api/member-ai": {
+        const rejected = await settings.setMemberLLM(toLLM({ ...body, for: "members" }), body.skipTest === true);
+        return rejected ? { status: 400, body: { error: rejected } } : { body: state(opts) };
+      }
+      case "POST /api/members": {
+        const limit = (v: unknown) => (v === null || v === "" ? null : Number(v));
+        let rejected: string | null = null;
+        if ("perPersonDaily" in body || "perGroupDaily" in body) {
+          const m = loadConfig().memberReplies;
+          rejected = settings.setMemberLimits(
+            "perPersonDaily" in body ? limit(body.perPersonDaily) : m.perPersonDaily,
+            "perGroupDaily" in body ? limit(body.perGroupDaily) : m.perGroupDaily,
+          );
+        }
+        if (!rejected && body.enabled !== undefined) rejected = settings.setMemberReplies(body.enabled === true);
+        return rejected ? { status: 400, body: { error: rejected } } : { body: state(opts) };
+      }
       case "POST /api/images": {
         const rejected = await settings.setImageReading(body.enabled === true);
         return rejected ? { status: 400, body: { error: rejected } } : { body: state(opts) };
@@ -111,6 +143,10 @@ export async function startSettingsServer(opts: SettingsServerOptions) {
         if (body.notify !== undefined) {
           if (!NOTIFY_MODES.includes(body.notify as store.NotifyMode)) return { status: 400, body: { error: "Mode notif gak valid." } };
           store.setNotifyMode(g.jid, body.notify as store.NotifyMode);
+        }
+        if (body.members !== undefined) {
+          const rejected = settings.setMemberReplies(body.members === null ? null : body.members === true, g.jid);
+          if (rejected) return { status: 400, body: { error: rejected } };
         }
         if (body.readImages !== undefined) {
           if (body.readImages === null) store.setReadImages(g.jid, null);

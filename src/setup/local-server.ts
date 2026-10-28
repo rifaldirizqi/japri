@@ -3,10 +3,10 @@
 import crypto from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { configExists, loadConfig, type LLMConfig } from "../config.js";
+import { configExists, loadConfig, withOwnerKey, type LLMConfig } from "../config.js";
 import { openInBrowser } from "../desktop.js";
 import { ANTHROPIC_MODELS } from "../llm/anthropic.js";
-import { PROVIDERS, testToolCalling } from "../llm/index.js";
+import { PROVIDERS, testReply, testToolCalling } from "../llm/index.js";
 import { listModels } from "../llm/openai-compatible.js";
 import { asksApiKey, needsBaseUrl } from "./wizard.js";
 
@@ -49,12 +49,18 @@ export const providerList = () =>
     needsBaseUrl: needsBaseUrl(p.id),
   }));
 
-/** Pengaturan AI dari form. API key kosong = pakai key lama, kalau provider-nya sama. */
+/** Form AI ini buat AI anggota grup (bukan AI owner)? */
+const forMembers = (body: Body) => body.for === "members";
+
+/**
+ * Pengaturan AI dari form. API key kosong = pakai key lama, kalau provider-nya sama.
+ * Buat AI anggota, key lama = key AI anggota (kalau kosong juga, nanti pakai key owner, lihat withOwnerKey).
+ */
 export function toLLM(body: Body): LLMConfig {
   const preset = PROVIDERS.find((p) => p.id === str(body.provider));
   if (!preset) throw new Error("Provider gak dikenal");
   const provider = preset.id;
-  const old = configExists() ? loadConfig().llm : undefined;
+  const old = !configExists() ? undefined : forMembers(body) ? (loadConfig().memberReplies.llm ?? undefined) : loadConfig().llm;
   const apiKey = asksApiKey(provider) ? str(body.apiKey) || (old?.provider === provider ? old.apiKey : undefined) : undefined;
   return {
     provider,
@@ -68,7 +74,7 @@ export function toLLM(body: Body): LLMConfig {
 export async function commonRoutes(route: string, body: Body): Promise<Reply | undefined> {
   switch (route) {
     case "POST /api/models": {
-      const llm = toLLM(body);
+      const llm = forMembers(body) ? withOwnerKey(toLLM(body)) : toLLM(body);
       if (llm.provider === "anthropic") return { body: { models: ANTHROPIC_MODELS.map((m) => m.id) } };
       try {
         return { body: { models: await listModels(llm) } };
@@ -79,7 +85,7 @@ export async function commonRoutes(route: string, body: Body): Promise<Reply | u
     case "POST /api/test": {
       const llm = toLLM(body);
       if (!llm.model) return { status: 400, body: { error: "Model belum dipilih" } };
-      return { body: await testToolCalling(llm) };
+      return { body: forMembers(body) ? await testReply(withOwnerKey(llm)) : await testToolCalling(llm) };
     }
     case "POST /api/open": {
       const link = str(body.url);

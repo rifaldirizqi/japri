@@ -96,8 +96,12 @@
     border: 2px solid #c8c8c8; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 10px 18px; border-top: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { text-align: left; padding: 10px 6px; border-top: 1px solid var(--line); vertical-align: middle; }
+  th:first-child, td:first-child { padding-left: 18px; width: 28%; }
+  th:nth-child(2) { width: 21%; }
+  th:last-child, td:last-child { padding-right: 18px; }
+  td select { width: 100%; }
   th { font-weight: 600; font-size: 12.5px; color: var(--muted); border-top: 0; }
   td.name { user-select: text; overflow-wrap: anywhere; }
 
@@ -181,47 +185,100 @@ const select = (options, value, onchange, attrs) =>
   h("select", { ...attrs, onchange: (e) => onchange(e.target.value) }, options.map(([v, label]) => h("option", { value: v, selected: String(v) === String(value) }, label)));
 
 // ---------- Bagian-bagian ----------
-const ai = { provider: null, baseUrl: "", apiKey: "", model: "", models: null, modelsFor: "", busy: false, error: "", lastBody: null };
+// Form AI dipakai dua kali: AI lo (owner) dan AI buat anggota grup.
+const newForm = (opts) => ({ ...opts, provider: null, baseUrl: "", apiKey: "", model: "", models: null, modelsFor: "", modelsError: "", busy: false, error: "" });
+const ai = newForm({ page: "ai", endpoint: "/api/ai", cur: () => S.config.llm, testing: "Ngetes koneksi & tool calling…" });
+const memberAi = newForm({ page: "members", endpoint: "/api/member-ai", members: true, cur: () => S.config.members.llm, testing: "Ngetes koneksi…" });
+const providerLabel = (id) => (S.providers.find((x) => x.id === id)?.label || id).replace(/ \(.*\)$/, "");
+
+/** API key boleh dikosongin? Return teks placeholder-nya (pakai key yang sekarang, atau key owner buat AI anggota). */
+function keySource(f) {
+  const cur = f.cur();
+  if (cur && f.provider === cur.provider && cur.hasKey) return "Kosongin buat tetap pakai API key yang sekarang";
+  if (f.members && f.provider === S.config.llm.provider && S.config.llm.hasKey) return "Kosongin buat pakai API key AI lo (punya owner)";
+  return "";
+}
+function formChanged(f, p) {
+  const cur = f.cur();
+  if (!cur) return true;
+  return f.provider !== cur.provider || f.model !== cur.model || f.apiKey !== "" || (p.needsBaseUrl && f.baseUrl !== (cur.baseUrl || ""));
+}
+const canSave = (f, p) => !f.busy && formChanged(f, p) && !!f.model && (!p.needsKey || !!keySource(f) || f.apiKey.length > 10);
+
+function aiForm(f) {
+  // AI anggota yang belum pernah diatur: mulai dari penyedia yang sama kayak AI owner
+  const cur = f.cur() || { provider: S.config.llm.provider, baseUrl: S.config.llm.baseUrl, model: "" };
+  if (f.provider === null) Object.assign(f, { provider: cur.provider, baseUrl: cur.baseUrl || "", model: cur.model });
+  const p = S.providers.find((x) => x.id === f.provider);
+  loadModels(f);
+  return h("div", { class: "card" }, h("div", { class: "stack" },
+    h("label", { class: "field" }, h("span", {}, "Penyedia AI"),
+      select(S.providers.map((x) => [x.id, x.label]), f.provider, (v) => {
+        const np = S.providers.find((x) => x.id === v);
+        Object.assign(f, { provider: v, apiKey: "", model: v === cur.provider ? cur.model : "", error: "",
+          baseUrl: v === cur.provider ? (cur.baseUrl || "") : (np.baseUrl || "") });
+        render();
+      }, { class: "w-full" })),
+    p.needsBaseUrl && h("label", { class: "field" }, h("span", {}, "Alamat server (base URL)"),
+      h("input", { type: "text", class: "w-full", value: f.baseUrl, spellcheck: "false", onchange: (e) => { f.baseUrl = e.target.value.trim(); f.error = ""; render(); } })),
+    p.asksApiKey && h("label", { class: "field" }, h("span", {}, p.needsKey ? "API key" : "API key (kosongin kalau gak perlu)"),
+      h("input", { type: "password", class: "w-full", value: f.apiKey, autocomplete: "off", spellcheck: "false", placeholder: keySource(f),
+        onchange: (e) => { f.apiKey = e.target.value.trim(); f.error = ""; render(); } })),
+    p.keyHelp && h("p", { class: "small muted" }, "Belum punya? ",
+      h("button", { class: "link", onclick: () => api("/api/open", { url: p.keyHelp }).catch(() => {}) }, "Bikin API key di " + new URL(p.keyHelp).host + " ↗")),
+    modelPicker(f),
+    f.modelsError && h("p", { class: "small muted" }, "Daftar model gak bisa diambil: " + f.modelsError.replace(/\.+$/, "") + ". Ketik nama modelnya manual."),
+    f.error && h("div", { class: "error" }, h("b", {}, "Tes gagal: "), f.error, h("br"),
+      h("button", { class: "link", onclick: () => saveAi(f, true) }, "Simpan aja tanpa tes"), " (Japri mungkin gak jalan bener)"),
+    h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:4px" },
+      h("button", { class: "btn primary", id: "aiSave", disabled: !canSave(f, p), onclick: () => saveAi(f, false) }, "Tes & simpan"),
+      f.cur() && formChanged(f, p) && !f.busy && h("button", { class: "btn", onclick: () => { f.provider = null; f.apiKey = ""; f.error = ""; render(); } }, "Batal"),
+      f.busy && h("span", { class: "muted" }, h("span", { class: "spin" }), f.testing)),
+  ));
+}
 
 const pages = {
   ai: {
     label: "AI",
     render() {
       const cur = S.config.llm;
-      if (ai.provider === null) Object.assign(ai, { provider: cur.provider, baseUrl: cur.baseUrl || "", model: cur.model });
-      const p = S.providers.find((x) => x.id === ai.provider);
-      const keepsKey = ai.provider === cur.provider && cur.hasKey;
-      loadModels();
-      const changed = ai.provider !== cur.provider || ai.model !== cur.model || ai.apiKey !== "" || (p.needsBaseUrl && ai.baseUrl !== (cur.baseUrl || ""));
-      const providerLabel = (id) => S.providers.find((x) => x.id === id)?.label || id;
       return [
-        h("p", { class: "muted" }, "Sekarang pakai ", h("b", {}, providerLabel(cur.provider).replace(/ \(.*\)$/, "") + " / " + cur.model), "."),
-        h("div", { class: "card" }, h("div", { class: "stack" },
-          h("label", { class: "field" }, h("span", {}, "Penyedia AI"),
-            select(S.providers.map((x) => [x.id, x.label]), ai.provider, (v) => {
-              const np = S.providers.find((x) => x.id === v);
-              Object.assign(ai, { provider: v, apiKey: "", model: v === cur.provider ? cur.model : "", error: "",
-                baseUrl: v === cur.provider ? (cur.baseUrl || "") : (np.baseUrl || "") });
-              render();
-            }, { class: "w-full" })),
-          p.needsBaseUrl && h("label", { class: "field" }, h("span", {}, "Alamat server (base URL)"),
-            h("input", { type: "text", class: "w-full", value: ai.baseUrl, spellcheck: "false", onchange: (e) => { ai.baseUrl = e.target.value.trim(); ai.error = ""; render(); } })),
-          p.asksApiKey && h("label", { class: "field" }, h("span", {}, p.needsKey ? "API key" : "API key (kosongin kalau gak perlu)"),
-            h("input", { type: "password", class: "w-full", value: ai.apiKey, autocomplete: "off", spellcheck: "false",
-              placeholder: keepsKey ? "Kosongin buat tetap pakai API key yang sekarang" : "",
-              onchange: (e) => { ai.apiKey = e.target.value.trim(); ai.error = ""; render(); } })),
-          p.keyHelp && h("p", { class: "small muted" }, "Belum punya? ",
-            h("button", { class: "link", onclick: () => api("/api/open", { url: p.keyHelp }).catch(() => {}) }, "Bikin API key di " + new URL(p.keyHelp).host + " ↗")),
-          modelPicker(),
-          ai.modelsError && h("p", { class: "small muted" }, "Daftar model gak bisa diambil: " + ai.modelsError.replace(/\.+$/, "") + ". Ketik nama modelnya manual."),
-          ai.error && h("div", { class: "error" }, h("b", {}, "Tes gagal: "), ai.error, h("br"),
-            h("button", { class: "link", onclick: () => saveAi(true) }, "Simpan aja tanpa tes"), " (Japri mungkin gak jalan bener)"),
-          h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:4px" },
-            h("button", { class: "btn primary", id: "aiSave", disabled: ai.busy || !changed || !ai.model || (p.needsKey && !keepsKey && ai.apiKey.length <= 10), onclick: () => saveAi(false) }, "Tes & simpan"),
-            changed && !ai.busy && h("button", { class: "btn", onclick: () => { ai.provider = null; ai.apiKey = ""; ai.error = ""; render(); } }, "Batal"),
-            ai.busy && h("span", { class: "muted" }, h("span", { class: "spin" }), "Ngetes koneksi & tool calling…")),
-        )),
+        h("p", { class: "muted" }, "Sekarang pakai ", h("b", {}, providerLabel(cur.provider) + " / " + cur.model), "."),
+        aiForm(ai),
         h("p", { class: "small muted", style: "margin-top:10px" }, "Model baru dites dulu sebelum disimpan. API key cuma disimpan di komputer ini."),
+      ];
+    },
+  },
+
+  members: {
+    label: "AI buat anggota",
+    render() {
+      const m = S.config.members;
+      const limit = (value, key) => h("input", { type: "number", class: "w-sm", min: 1, max: 10000, value: value ?? "", placeholder: "∞",
+        onchange: (e) => save("/api/members", { [key]: e.target.value === "" ? null : Number(e.target.value) }) });
+      const on = S.groups.filter((g) => g.membersOn);
+      const total = S.groups.reduce((n, g) => n + g.memberUsage, 0);
+      return [
+        h("p", { class: "muted" }, "Anggota grup bisa nanya apa aja ke Japri: tag Japri, bales pesan Japri, atau awali pesan dengan /ai. ",
+          "AI ini terpisah dari AI lo: gak bisa baca catatan grup, ngerangkum, bikin reminder, atau ngubah pengaturan."),
+        h("div", { class: "card" },
+          row("Jawab anggota di semua grup", m.llm ? "Bisa diubah per grup di bagian Grup. Grup yang baru nyala dapet pengumuman sekali." : "Atur AI-nya dulu di bawah.",
+            m.llm ? toggle(m.enabled, (v) => save("/api/members", { enabled: v })) : h("span", { class: "muted" }, "Belum diatur")),
+          m.llm && row("Nyala di", "", h("span", { class: "muted", style: "max-width:260px;text-align:right" },
+            on.length ? on.map((g) => g.name || "(tanpa nama)").join(", ") : "Belum ada grup")),
+        ),
+        h("h2", {}, "AI yang dipakai"),
+        m.llm && h("p", { class: "muted" }, "Sekarang pakai ", h("b", {}, providerLabel(m.llm.provider) + " / " + m.llm.model),
+          m.llm.hasKey ? " (API key sendiri)." : m.llm.provider === S.config.llm.provider ? " (pakai API key AI lo)." : "."),
+        aiForm(memberAi),
+        h("p", { class: "small muted", style: "margin-top:10px" }, "AI anggota gak pakai tool, jadi model gratis atau lokal juga bisa. Biayanya ditanggung API key yang dipasang di sini."),
+        h("h2", {}, "Jatah & pemakaian"),
+        h("div", { class: "card" },
+          row("Jatah per orang", "Pertanyaan per orang per grup tiap hari. Kosongin = tanpa batas.", limit(m.perPersonDaily, "perPersonDaily"), h("span", { class: "muted" }, "/hari")),
+          row("Jatah per grup", "Pertanyaan per grup tiap hari. Kosongin = tanpa batas.", limit(m.perGroupDaily, "perGroupDaily"), h("span", { class: "muted" }, "/hari")),
+          row("Dijawab 7 hari terakhir", "Rinciannya per grup ada di bagian Grup.", h("span", {}, total + " pertanyaan")),
+        ),
+        h("p", { class: "small muted", style: "margin-top:10px" }, "Biar nomor bot gak dianggap spam, Japri ngasih jeda beberapa detik antar balasan di grup yang sama."),
       ];
     },
   },
@@ -308,16 +365,19 @@ const pages = {
         return out;
       }
       out.push(h("div", { class: "card" }, h("table", {},
-        h("thead", {}, h("tr", {}, h("th", {}, "Grup"), h("th", {}, "Notif"), h("th", {}, "Baca gambar"))),
+        h("thead", {}, h("tr", {}, h("th", {}, "Grup"), h("th", {}, "Notif"), h("th", {}, "Baca gambar"), h("th", {}, "Jawab anggota"))),
         h("tbody", {}, S.groups.map((g) => h("tr", {},
           h("td", { class: "name" }, g.name || "(tanpa nama)"),
-          h("td", {}, select([["all", "Semua"], ["mentions", "Cuma tag & reply"], ["off", "Mati"]], g.notify,
+          h("td", {}, select([["all", "Semua"], ["mentions", "Tag & reply"], ["off", "Mati"]], g.notify,
             (v) => save("/api/group", { jid: g.jid, notify: v }))),
-          h("td", {}, select([["", `Ikut umum (${c.readImages ? "nyala" : "mati"})`], ["1", "Nyala"], ["0", "Mati"]], g.readImages == null ? "" : String(g.readImages),
+          h("td", {}, select([["", `Umum: ${c.readImages ? "nyala" : "mati"}`], ["1", "Nyala"], ["0", "Mati"]], g.readImages == null ? "" : String(g.readImages),
             (v) => save("/api/group", { jid: g.jid, readImages: v === "" ? null : v === "1" }))),
+          h("td", {}, select([["", `Umum: ${c.members.enabled ? "nyala" : "mati"}`], ["1", "Nyala"], ["0", "Mati"]], g.members == null ? "" : String(g.members),
+            (v) => save("/api/group", { jid: g.jid, members: v === "" ? null : v === "1" }), { disabled: !c.members.llm && g.members == null }),
+            g.memberUsage > 0 && h("div", { class: "small muted" }, g.memberUsage + " pertanyaan / 7 hari")),
         ))),
       )));
-      out.push(h("p", { class: "small muted", style: "margin-top:10px" }, "Grup yang notifnya dimatiin tetap dicatat dan tetap masuk rangkuman."));
+      out.push(h("p", { class: "small muted", style: "margin-top:10px" }, "\"Umum\" = ikut pengaturan buat semua grup. Grup yang notifnya dimatiin tetap dicatat dan tetap masuk rangkuman. AI yang ngejawab anggota diatur di bagian AI buat anggota."));
       return out;
     },
   },
@@ -347,27 +407,27 @@ const pages = {
 };
 
 /** Pilih model: kotak cari + daftar yang selalu kelihatan, plus kolom buat ngetik model yang gak ada di daftar. */
-function modelPicker() {
-  if (ai.models === null) return h("p", { class: "muted" }, h("span", { class: "spin" }), "Ngambil daftar model…");
+function modelPicker(f) {
+  if (f.models === null) return h("p", { class: "muted" }, h("span", { class: "spin" }), "Ngambil daftar model…");
   const pick = (model, from) => {
-    ai.model = model; ai.error = "";
+    f.model = model; f.error = "";
     if (from !== "list") document.getElementById("modelSelect")?.querySelectorAll("option:checked").forEach((o) => (o.selected = false));
     if (from !== "manual") { const m = document.getElementById("manualModel"); if (m) m.value = ""; }
-    updateAiButton();
+    updateAiButton(f);
   };
   const manual = (label) => h("div", { class: "field" }, h("span", {}, label),
     h("input", { type: "text", class: "w-full", id: "manualModel", spellcheck: "false",
-      value: ai.models.includes(ai.model) ? "" : ai.model,
-      placeholder: ai.provider === "ollama" ? "cek pakai `ollama list`" : "",
+      value: f.models.includes(f.model) ? "" : f.model,
+      placeholder: f.provider === "ollama" ? "cek pakai `ollama list`" : "",
       oninput: (e) => pick(e.target.value.trim(), "manual") }));
-  if (!ai.models.length) return manual("Model");
+  if (!f.models.length) return manual("Model");
 
-  const labels = ai.provider === "anthropic" ? Object.fromEntries(S.anthropicModels.map((m) => [m.id, m.label])) : {};
+  const labels = f.provider === "anthropic" ? Object.fromEntries(S.anthropicModels.map((m) => [m.id, m.label])) : {};
   const list = h("select", { size: 8, class: "w-full", id: "modelSelect", onchange: (e) => pick(e.target.value, "list") });
   const fill = (term) => {
     const t = term.trim().toLowerCase();
-    const shown = ai.models.filter((m) => !t || m.toLowerCase().includes(t) || (labels[m] || "").toLowerCase().includes(t));
-    list.replaceChildren(...(shown.length ? shown.map((m) => h("option", { value: m, selected: m === ai.model }, labels[m] || m))
+    const shown = f.models.filter((m) => !t || m.toLowerCase().includes(t) || (labels[m] || "").toLowerCase().includes(t));
+    list.replaceChildren(...(shown.length ? shown.map((m) => h("option", { value: m, selected: m === f.model }, labels[m] || m))
       : [h("option", { disabled: true }, "Gak ada model yang cocok")]));
   };
   fill("");
@@ -377,46 +437,43 @@ function modelPicker() {
     if (o) list.scrollTop = o.offsetTop - list.clientHeight / 2;
   });
   return [
-    h("div", { class: "field" }, h("span", {}, `Model (${ai.models.length} tersedia)`),
+    h("div", { class: "field" }, h("span", {}, `Model (${f.models.length} tersedia)`),
       h("input", { type: "text", class: "w-full", style: "margin-bottom:6px", spellcheck: "false",
-        placeholder: ai.provider === "openrouter" ? "Cari model, mis. haiku, atau :free buat model gratis" : "Cari model",
+        placeholder: f.provider === "openrouter" ? "Cari model, mis. haiku, atau :free buat model gratis" : "Cari model",
         oninput: (e) => fill(e.target.value) }),
       list),
     manual("Atau ketik nama model lain"),
   ];
 }
 
-async function saveAi(skipTest) {
-  ai.busy = true; ai.error = ""; render();
+async function saveAi(f, skipTest) {
+  f.busy = true; f.error = ""; render();
   try {
-    S = await api("/api/ai", { provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model, skipTest });
-    ai.provider = null; ai.apiKey = "";
-    toast("Tersimpan. AI baru langsung dipakai.");
+    S = await api(f.endpoint, { provider: f.provider, baseUrl: f.baseUrl, apiKey: f.apiKey, model: f.model, skipTest });
+    f.provider = null; f.apiKey = "";
+    toast(f.members ? "Tersimpan. AI anggota baru langsung dipakai." : "Tersimpan. AI baru langsung dipakai.");
   } catch (e) {
-    ai.error = e.message;
+    f.error = e.message;
   }
-  ai.busy = false;
+  f.busy = false;
   render();
 }
 
-function loadModels() {
-  const key = JSON.stringify([ai.provider, ai.baseUrl, ai.apiKey]);
-  if (ai.modelsFor === key) return;
-  ai.modelsFor = key; ai.models = null; ai.modelsError = "";
-  api("/api/models", { provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey }).then(
-    (r) => { if (ai.modelsFor === key) { ai.models = r.models; ai.modelsError = r.error || ""; if (current === "ai") render(); } },
-    (e) => { if (ai.modelsFor === key) { ai.models = []; ai.modelsError = e.message; if (current === "ai") render(); } },
+function loadModels(f) {
+  const body = { provider: f.provider, baseUrl: f.baseUrl, apiKey: f.apiKey, for: f.members ? "members" : undefined };
+  const key = JSON.stringify(body);
+  if (f.modelsFor === key) return;
+  f.modelsFor = key; f.models = null; f.modelsError = "";
+  api("/api/models", body).then(
+    (r) => { if (f.modelsFor === key) { f.models = r.models; f.modelsError = r.error || ""; if (current === f.page) render(); } },
+    (e) => { if (f.modelsFor === key) { f.models = []; f.modelsError = e.message; if (current === f.page) render(); } },
   );
 }
 
-function updateAiButton() {
+function updateAiButton(f) {
   // Ketik model gak render ulang (biar kursor gak lompat); cukup update tombolnya
   const b = document.getElementById("aiSave");
-  const cur = S.config.llm;
-  const p = S.providers.find((x) => x.id === ai.provider);
-  const keepsKey = ai.provider === cur.provider && cur.hasKey;
-  const changed = ai.provider !== cur.provider || ai.model !== cur.model || ai.apiKey !== "" || (p.needsBaseUrl && ai.baseUrl !== (cur.baseUrl || ""));
-  if (b) b.disabled = ai.busy || !changed || !ai.model || (p.needsKey && !keepsKey && ai.apiKey.length <= 10);
+  if (b) b.disabled = !canSave(f, S.providers.find((x) => x.id === f.provider));
 }
 
 // ---------- Navigasi ----------

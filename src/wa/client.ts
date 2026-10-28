@@ -32,6 +32,8 @@ export type IncomingMessage = {
   ts: number;
   mentionedIds: string[];
   quotedSenderId: string | null;
+  /** Isi pesan yang dibales (kalau ada) */
+  quotedText: string | null;
   mentionsBot: boolean;
   /** Ada gambar yang bisa dibaca (bukan stiker / sekali lihat) */
   hasImage: boolean;
@@ -164,6 +166,7 @@ async function parse(msg: WAMessage): Promise<IncomingMessage | null> {
     ts: Number(msg.messageTimestamp ?? Math.floor(Date.now() / 1000)),
     mentionedIds,
     quotedSenderId,
+    quotedText: ctx?.quotedMessage ? extractText(normalizeMessageContent(ctx.quotedMessage)) : null,
     mentionsBot: mentionedIds.some(isBotId) || isBotId(quotedSenderId),
     hasImage: !!content?.imageMessage && !viewOnce,
   };

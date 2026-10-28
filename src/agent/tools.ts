@@ -9,9 +9,10 @@ import { MAX_IMAGES_PER_DAY } from "../vision.js";
 import { installUpdate } from "../selfupdate.js";
 import { ownerJid } from "../notify.js";
 import { sendText } from "../wa/client.js";
-import { formatTs, nowTs } from "../time.js";
+import { formatTs, localDate, nowTs } from "../time.js";
 import { checkForUpdate, currentVersion, updateMessage } from "../updater.js";
 import * as settings from "../settings.js";
+import { wantsMemberReplies } from "./member.js";
 
 function resolveGroup(query: string, current?: store.Chat): store.Chat | string {
   if (query === "current") return current ?? "Perintah ini gak dikirim dari grup. Tanyakan grup yang mana.";
@@ -30,6 +31,16 @@ const NOTIFY_LABEL: Record<store.NotifyMode, string> = {
   mentions: "cuma tag & reply",
   off: "mati",
 };
+
+/** Ringkasan AI anggota: AI-nya, grup yang dijawab, jatah. */
+function memberSummary(): string {
+  const m = loadConfig().memberReplies;
+  if (!m.llm) return "belum diatur";
+  const on = store.listGroups().filter((g) => wantsMemberReplies(g)).map((g) => g.name ?? "(tanpa nama)");
+  const key = m.llm.apiKey ? "API key sendiri" : m.llm.provider === loadConfig().llm.provider ? "pakai API key owner" : "tanpa API key";
+  const limits = [m.perPersonDaily && `${m.perPersonDaily}/orang/hari`, m.perGroupDaily && `${m.perGroupDaily}/grup/hari`].filter(Boolean);
+  return `${m.llm.provider} / ${m.llm.model} (${key}); jawab anggota di: ${on.length ? on.join(", ") : "gak ada grup"}${m.enabled ? " (umum: nyala)" : ""}; jatah: ${limits.length ? limits.join(", ") : "tanpa batas"}`;
+}
 
 const hmInput = (what: string) => z.string().describe(`${what}, format 24 jam HH:MM, mis. 21:00`);
 
@@ -195,6 +206,7 @@ export function buildTools(current?: store.Chat) {
           `Versi Japri: v${currentVersion}`,
           `Cek update otomatis: ${c.checkUpdates ? "nyala" : "mati"}`,
           `Saran reminder dari tugas di grup: ${c.taskOffers ? "nyala" : "mati"}`,
+          `AI buat anggota grup: ${memberSummary()}`,
           `Baca gambar di grup: ${c.readImages ? "nyala" : "mati"} (umum)` +
             (() => {
               const custom = store.listGroups().filter((g) => g.read_images != null);
@@ -368,6 +380,67 @@ export function buildTools(current?: store.Chat) {
         if (rejected) return `${rejected}. Sarankan owner ganti ke model yang bisa baca gambar (mis. Claude, GPT-4o/5, Gemini). Pengaturan gak diubah.`;
         if (g) return `Baca gambar di "${g.name}": ${enabled ? "nyala" : "mati"}.`;
         return `Baca gambar di semua grup: ${enabled ? `nyala (maks ${MAX_IMAGES_PER_DAY} gambar/hari; stiker & foto sekali lihat dilewati)` : "mati"}.`;
+      },
+    }),
+
+    defineTool({
+      name: "set_member_ai",
+      description:
+        "Atur AI buat anggota grup: AI umum (tanpa tool, gak bisa baca catatan grup) yang ngejawab siapa aja di grup kalau di-tag, dibales, atau diawali /ai. Isi hanya yang mau diubah. " +
+        "Model diganti lewat chat selalu pakai penyedia & API key owner; penyedia/API key lain cuma bisa diatur di jendela Pengaturan (Windows) atau setup ulang, jangan pernah minta owner ngetik API key di chat. " +
+        "Nyalain butuh AI anggota udah diatur. Pas grup baru dinyalain, Japri ngumumin sekali di grup itu.",
+      input: z.object({
+        enabled: z.boolean().optional().describe("Nyalain/matiin jawab anggota"),
+        group: z.string().optional().describe("Nama grup kalau cuma buat satu grup; kosongin buat semua grup"),
+        model: z.string().optional().describe("Model buat anggota, dari penyedia AI yang sama dengan owner"),
+        per_person_daily: z.number().int().min(1).max(10000).nullable().optional().describe("Jatah pertanyaan per orang per hari; null = tanpa batas"),
+        per_group_daily: z.number().int().min(1).max(10000).nullable().optional().describe("Jatah pertanyaan per grup per hari; null = tanpa batas"),
+      }),
+      run: async (input) => {
+        const c = loadConfig();
+        const done: string[] = [];
+        if (input.model) {
+          const rejected = await settings.setMemberLLM({ provider: c.llm.provider, baseUrl: c.llm.baseUrl, model: input.model });
+          if (rejected) return `Model "${input.model}" gak bisa dipakai buat anggota: ${rejected}. Gak ada yang diubah.`;
+          done.push(`model anggota: ${c.llm.provider} / ${input.model} (pakai API key owner)`);
+        }
+        if (input.per_person_daily !== undefined || input.per_group_daily !== undefined) {
+          const m = loadConfig().memberReplies;
+          const rejected = settings.setMemberLimits(
+            input.per_person_daily === undefined ? m.perPersonDaily : input.per_person_daily,
+            input.per_group_daily === undefined ? m.perGroupDaily : input.per_group_daily,
+          );
+          if (rejected) return rejected;
+          done.push("jatah");
+        }
+        if (input.enabled !== undefined) {
+          let g: store.Chat | undefined;
+          if (input.group) {
+            const found = resolveGroup(input.group, current);
+            if (typeof found === "string") return found;
+            g = found;
+          }
+          const rejected = settings.setMemberReplies(input.enabled, g?.jid);
+          if (rejected) return `${rejected}${done.length ? ` (yang udah disimpan: ${done.join(", ")})` : ""}`;
+          done.push(`jawab anggota ${input.enabled ? "nyala" : "mati"} di ${g ? `"${g.name}"` : "semua grup"}`);
+        }
+        return done.length ? `Disimpan: ${done.join("; ")}.\nSekarang: ${memberSummary()}` : `Gak ada yang diubah. Sekarang: ${memberSummary()}`;
+      },
+    }),
+
+    defineTool({
+      name: "get_member_ai_usage",
+      description: "Lihat pengaturan AI buat anggota grup dan berapa pertanyaan anggota yang dijawab 7 hari terakhir, per grup.",
+      input: z.object({}),
+      run: async () => {
+        const from = localDate(nowTs() - 6 * 86400, tz);
+        const usage = store.memberUsageSince(from);
+        const name = (jid: string) => store.getGroup(jid)?.name ?? "(grup yang udah ditinggal)";
+        return [
+          `AI buat anggota: ${memberSummary()}`,
+          `Pertanyaan anggota yang dijawab sejak ${from}: ${usage.reduce((n, u) => n + u.count, 0)}`,
+          ...usage.map((u) => `- ${name(u.chat_jid)}: ${u.count}`),
+        ].join("\n");
       },
     }),
 

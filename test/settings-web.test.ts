@@ -124,6 +124,41 @@ test("pengaturan: notif & baca gambar per grup", async () => {
   assert.equal(store.listGroups().find((g) => g.jid === kantor)!.read_images, null);
 });
 
+test("pengaturan: AI buat anggota terpisah, key-nya gak bocor, wajib diatur sebelum dinyalain", async () => {
+  const kantor = "120363000000000001@g.us";
+  let s = (await api("/api/state")).data;
+  assert.equal(s.config.members.llm, null);
+  assert.equal((await api("/api/members", { enabled: true })).status, 400);
+  assert.equal((await api("/api/group", { jid: kantor, members: true })).status, 400);
+
+  // Tes gagal (server AI mati) → gak disimpan
+  assert.equal((await api("/api/member-ai", { provider: "custom", baseUrl: DEAD, model: "m" })).status, 400);
+  assert.equal(loadConfig().memberReplies.llm, null);
+
+  // Provider beda dari owner, pakai key sendiri
+  let r = await api("/api/member-ai", { provider: "openrouter", model: "x/gratis:free", apiKey: "sk-or-anggota-000000", skipTest: true });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.data.config.members.llm, { provider: "openrouter", model: "x/gratis:free", baseUrl: "https://openrouter.ai/api/v1", hasKey: true });
+  assert.ok(!JSON.stringify(r.data).includes("sk-or-anggota"));
+  assert.equal(loadConfig().llm.provider, "ollama"); // AI owner gak ikut berubah
+  // Ganti model, key kosong = key AI anggota yang lama (bukan key owner)
+  await api("/api/member-ai", { provider: "openrouter", model: "x/lain", apiKey: "", skipTest: true });
+  assert.equal(loadConfig().memberReplies.llm!.apiKey, "sk-or-anggota-000000");
+
+  r = await api("/api/members", { perPersonDaily: 20, perGroupDaily: "" });
+  assert.deepEqual([r.data.config.members.perPersonDaily, r.data.config.members.perGroupDaily], [20, null]);
+  assert.equal((await api("/api/members", { perPersonDaily: 0 })).status, 400);
+
+  assert.equal((await api("/api/group", { jid: kantor, members: true })).status, 200);
+  s = (await api("/api/state")).data;
+  const g = s.groups.find((x: any) => x.jid === kantor);
+  assert.deepEqual([g.members, g.membersOn, g.memberUsage], [1, true, 0]);
+  assert.equal(s.groups.find((x: any) => x.jid !== kantor).membersOn, false);
+  assert.equal((await api("/api/members", { enabled: true })).status, 200);
+  assert.equal(store.listGroups().find((x) => x.jid === kantor)!.member_replies, null); // ikut umum lagi
+  assert.equal((await api("/api/state")).data.groups.every((x: any) => x.membersOn), true);
+});
+
 test("pengaturan: setup ulang dikabarin ke Japri.exe", async () => {
   await api("/api/resetup", {});
   await new Promise((r) => setTimeout(r, 200));

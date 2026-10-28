@@ -1,6 +1,6 @@
 import { input, password, search, select } from "@inquirer/prompts";
-import { configExists, loadConfig, newConfig, saveConfig, type LLMConfig } from "../config.js";
-import { PROVIDERS, testToolCalling } from "../llm/index.js";
+import { configExists, loadConfig, newConfig, saveConfig, type LLMConfig, type MemberReplies } from "../config.js";
+import { PROVIDERS, testReply, testToolCalling } from "../llm/index.js";
 import { ANTHROPIC_MODELS } from "../llm/anthropic.js";
 import { listModels } from "../llm/openai-compatible.js";
 import { isValidTimezone } from "../time.js";
@@ -98,8 +98,12 @@ function llmSteps(provider: string): LLMStep[] {
   return steps;
 }
 
+type ModelTest = { run: (llm: LLMConfig) => Promise<{ ok: boolean; detail: string }>; label: string };
+const TOOL_TEST: ModelTest = { run: testToolCalling, label: "Ngetes koneksi & kemampuan tool calling..." };
+const REPLY_TEST: ModelTest = { run: testReply, label: "Ngetes koneksi..." };
+
 /** fromModel: mulai dari pilih model (balik dari langkah sesudahnya), bukan dari pilih provider. */
-async function chooseLLM(previous?: LLMConfig, fromModel = false): Promise<LLMConfig> {
+async function chooseLLM(previous?: LLMConfig, fromModel = false, test = TOOL_TEST): Promise<LLMConfig> {
   let provider = previous?.provider ?? PROVIDERS[0].id;
   let baseUrl = previous?.baseUrl;
   let apiKey = previous?.apiKey;
@@ -161,13 +165,13 @@ async function chooseLLM(previous?: LLMConfig, fromModel = false): Promise<LLMCo
           continue;
         }
         const llm: LLMConfig = { provider, model, apiKey, baseUrl };
-        console.log("  ⏳ Ngetes koneksi & kemampuan tool calling...");
-        const test = await testToolCalling(llm);
-        if (test.ok) {
-          console.log(`  ✅ ${test.detail}\n`);
+        console.log(`  ⏳ ${test.label}`);
+        const result = await test.run(llm);
+        if (result.ok) {
+          console.log(`  ✅ ${result.detail}\n`);
           return llm;
         }
-        console.log(`  ❌ ${test.detail}\n`);
+        console.log(`  ❌ ${result.detail}\n`);
         const next = await ask((ctx) =>
           select(
             {
@@ -211,6 +215,49 @@ async function chooseTimezone(current: string): Promise<string | Back> {
   }
 }
 
+/**
+ * Langkah opsional: AI buat anggota grup (v0.4.0). Docker & Node gak punya jendela Pengaturan, jadi
+ * penyedia/API key lain buat anggota diatur di sini. Return undefined = gak diubah, null = dihapus.
+ */
+async function chooseMemberLLM(owner: LLMConfig, current: LLMConfig | null): Promise<LLMConfig | null | undefined | Back> {
+  const ownerLabel = PROVIDERS.find((p) => p.id === owner.provider)!.label.replace(/ \(.*\)$/, "");
+  console.log(`
+  Opsional: AI buat anggota grup. Kalau nanti lo nyalain, anggota grup bisa nanya apa aja ke bot
+  (tag bot / bales pesannya / awali dengan /ai). AI ini terpisah dari AI lo dan gak bisa baca catatan grup.
+  Nyalainnya lewat chat ke bot, mis. "jawab semua orang di grup kantor".
+`);
+  for (;;) {
+    const choice = await ask((ctx) =>
+      select(
+        {
+          message: "AI buat anggota grup:",
+          choices: [
+            { value: "skip", name: current ? `Biarin (sekarang: ${current.provider} / ${current.model})` : "Lewati, atur nanti" },
+            { value: "same", name: `Pakai ${ownerLabel} juga (API key yang sama), pilih modelnya` },
+            { value: "other", name: "Pakai penyedia AI / API key lain" },
+            ...(current ? [{ value: "off", name: "Hapus AI buat anggota" }] : []),
+            BACK_CHOICE,
+          ],
+        },
+        ctx,
+      ),
+    );
+    if (choice === BACK) return BACK;
+    if (choice === "skip") return undefined;
+    if (choice === "off") return null;
+    // AI anggota yang selama ini numpang key owner gak dijadiin default (biar key owner gak kesimpen dobel)
+    if (choice === "other") return chooseLLM(current?.apiKey ? current : undefined, false, REPLY_TEST);
+
+    const model = await chooseModel(owner);
+    if (model === BACK) continue;
+    console.log(`  ⏳ ${REPLY_TEST.label}`);
+    const result = await testReply({ ...owner, model });
+    console.log(result.ok ? `  ✅ ${result.detail}\n` : `  ❌ ${result.detail}\n`);
+    // API key gak disimpan dobel: kosong = pakai key owner (ikut berubah kalau key owner diganti)
+    if (result.ok) return { provider: owner.provider, baseUrl: owner.baseUrl, model };
+  }
+}
+
 /** Wizard interaktif di terminal. Return setelah config tersimpan. */
 export async function runWizard() {
   const existing = configExists() ? loadConfig() : undefined;
@@ -226,8 +273,9 @@ Salah pilih? Tekan Esc buat balik ke langkah sebelumnya.
   let llm = existing?.llm;
   let botName = existing?.botName ?? "Japri";
   let timezone = existing?.timezone ?? "Asia/Jakarta";
+  let members: LLMConfig | null | undefined;
   let back = false; // true = baru balik dari langkah sesudahnya
-  for (let step = 0; step < 3; ) {
+  for (let step = 0; step < 4; ) {
     if (step === 0) {
       llm = await chooseLLM(llm, back);
       step++;
@@ -240,7 +288,7 @@ Salah pilih? Tekan Esc buat balik ke langkah sebelumnya.
       }
       botName = name;
       step++;
-    } else {
+    } else if (step === 2) {
       const tz = await chooseTimezone(timezone);
       if (tz === BACK) {
         step--;
@@ -249,10 +297,21 @@ Salah pilih? Tekan Esc buat balik ke langkah sebelumnya.
       }
       timezone = tz;
       step++;
+    } else {
+      const chosen = await chooseMemberLLM(llm!, existing?.memberReplies.llm ?? null);
+      if (chosen === BACK) {
+        step--;
+        back = true;
+        continue;
+      }
+      members = chosen;
+      step++;
     }
     back = false;
   }
 
-  saveConfig(existing ? { ...existing, llm: llm!, botName, timezone } : newConfig(llm!, { botName, timezone }));
+  const base = existing ?? newConfig(llm!);
+  const memberReplies: MemberReplies = members === undefined ? base.memberReplies : { ...base.memberReplies, llm: members };
+  saveConfig({ ...base, llm: llm!, botName, timezone, memberReplies });
   console.log("💾 Pengaturan disimpan di folder data/.\n");
 }

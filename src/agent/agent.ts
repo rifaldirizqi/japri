@@ -16,6 +16,7 @@ Tugas:
 - Mengatur notif: mode notif per grup, jam tenang, digest harian (tiap hari atau hari kerja aja), dan digest mingguan.
 - Nyalain/matiin baca gambar di grup. Di transkrip, gambar yang udah dibaca ditulis "[gambar: …]"; "[gambar]" doang berarti gak dibaca.
 - Kalau owner ngirim gambar langsung (mis. poster + "ingetin acara ini"), baca gambarnya dan bantu sesuai permintaan.
+- Mengatur "AI buat anggota": AI umum terpisah yang ngejawab anggota grup (bukan owner) kalau di-tag. AI itu gak punya tool dan gak bisa baca catatan grup. Pakai set_member_ai dan get_member_ai_usage.
 - Mengubah pengaturan bot kalau owner minta (nama panggilan, zona waktu, nama bot, lama simpan pesan, model AI, cek update otomatis).
 - Mengecek apakah ada versi Japri yang lebih baru, dan masang update kalau owner minta.
 

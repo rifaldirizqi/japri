@@ -1,12 +1,14 @@
 // Ubah pengaturan Japri. Dipakai bareng sama perintah chat (agent/tools.ts) dan jendela Pengaturan
 // (setup/settings-web.ts), biar aturan & efek sampingnya sama persis.
-import { loadConfig, updateConfig, type LLMConfig } from "./config.js";
+import { wantsMemberReplies } from "./agent/member.js";
+import { loadConfig, updateConfig, withOwnerKey, type LLMConfig, type MemberReplies } from "./config.js";
 import * as store from "./db.js";
 import { reportInfo } from "./desktop.js";
 import { digestHandledNow } from "./digest.js";
-import { testToolCalling } from "./llm/index.js";
+import { testReply, testToolCalling } from "./llm/index.js";
 import { formatMinutes, isValidTimezone, nowTs, parseHM } from "./time.js";
 import { readsImages, testVision } from "./vision.js";
+import { sendText } from "./wa/client.js";
 
 /** null = berhasil, string = pesan kenapa ditolak (pengaturan gak diubah). */
 export type Rejected = string | null;
@@ -100,5 +102,60 @@ export async function setLLM(llm: LLMConfig, skipTest = false): Promise<Rejected
   }
   updateConfig({ llm });
   reportInfo({ ai: `${llm.provider} / ${llm.model}` });
+  return null;
+}
+
+// ---------- AI buat anggota grup (v0.4.0) ----------
+
+const updateMembers = (patch: Partial<MemberReplies>) => updateConfig({ memberReplies: { ...loadConfig().memberReplies, ...patch } });
+
+/** Ganti AI anggota. Cukup dites bisa jawab (AI anggota gak pakai tool), kecuali skipTest. */
+export async function setMemberLLM(llm: LLMConfig, skipTest = false): Promise<Rejected> {
+  if (!llm.model) return "Model belum dipilih.";
+  if (!skipTest) {
+    const test = await testReply(withOwnerKey(llm));
+    if (!test.ok) return test.detail;
+  }
+  updateMembers({ llm });
+  return null;
+}
+
+/** Jatah pertanyaan per hari; null = tanpa batas. */
+export function setMemberLimits(perPerson: number | null, perGroup: number | null): Rejected {
+  const valid = (n: number | null) => n === null || (Number.isInteger(n) && n >= 1 && n <= 10000);
+  if (!valid(perPerson) || !valid(perGroup)) return "Jatah harus angka 1–10000, atau kosong buat tanpa batas.";
+  updateMembers({ perPersonDaily: perPerson, perGroupDaily: perGroup });
+  return null;
+}
+
+export const memberAnnouncement = () => {
+  const { botName } = loadConfig();
+  return `📢 Sekarang kalian bisa nanya apa aja ke gue: tag gue, bales pesan gue, atau awali dengan /ai.
+Contoh: _"/ai bikinin caption buat foto liburan"_
+
+Gue gak bisa baca isi obrolan grup ini buat kalian. Pertanyaan kalian dikirim ke penyedia AI yang dipakai ${botName}.`;
+};
+
+/**
+ * Jawab anggota di semua grup (jid kosong) atau satu grup. value null = grup ikut pengaturan umum.
+ * Grup yang baru nyala dapet pengumuman sekali.
+ */
+export function setMemberReplies(value: boolean | null, jid?: string): Rejected {
+  const c = loadConfig().memberReplies;
+  if (value === null && !jid) return "Pilih nyala atau mati.";
+  if (!c.llm && (value === true || (value === null && c.enabled))) {
+    return "AI buat anggota belum diatur. Pilih dulu penyedia & model AI-nya (di Pengaturan → AI buat anggota, atau bilang \"AI anggota pakai model X\").";
+  }
+  const before = new Set(store.listGroups().filter((g) => wantsMemberReplies(g)).map((g) => g.jid));
+  if (jid) store.setMemberReplies(jid, value === null ? null : value ? 1 : 0);
+  else {
+    updateMembers({ enabled: value === true });
+    for (const g of store.listGroups()) store.setMemberReplies(g.jid, null); // ikut pengaturan umum
+  }
+  for (const g of store.listGroups()) {
+    if (wantsMemberReplies(g) && !before.has(g.jid)) {
+      sendText(g.jid, memberAnnouncement()).catch((e) => console.error("Gagal kirim pengumuman ke grup:", e instanceof Error ? e.message : e));
+    }
+  }
   return null;
 }

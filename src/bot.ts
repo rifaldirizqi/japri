@@ -3,12 +3,13 @@ import { jidNormalizedUser } from "baileys";
 import { loadConfig, updateConfig } from "./config.js";
 import * as store from "./db.js";
 import { ask, lastOwnerReplyMs, resetHistory } from "./agent/agent.js";
+import { answersMembers, askMember } from "./agent/member.js";
 import { isQuietTime, ownerJid, sendToOwner } from "./notify.js";
 import { acceptOffer, detectTask, latestOfferAfter, makeOffer } from "./tasks.js";
-import { formatHM, nowTs } from "./time.js";
+import { formatHM, localDate, nowTs } from "./time.js";
 import { installUpdate } from "./selfupdate.js";
 import { describeImage, readsImages, takeImageQuota, withDescription } from "./vision.js";
-import { botNumber, downloadImage, groupAdminIds, leaveGroup, sendText, showTyping, type IncomingMessage } from "./wa/client.js";
+import { botNumber, downloadImage, groupAdminIds, isBotId, leaveGroup, sendText, showTyping, type IncomingMessage } from "./wa/client.js";
 
 // ---------- Owner ----------
 
@@ -59,6 +60,7 @@ Ngobrol biasa aja, contoh:
 • kirim rangkuman tiap hari kerja jam 9 malam
 • rangkuman mingguan tiap minggu jam 7 malam
 • baca gambar di semua grup
+• jawab semua orang di grup kantor
 • matiin notif grup alumni
 • jangan ganggu jam 10 malam sampai 6 pagi
 • ada update Japri gak? (bales *update* buat langsung update)
@@ -69,11 +71,14 @@ Gue otomatis DM lo kalau ada yang tag lo, bales pesan lo, atau nyebut nama pangg
 *Perintah:* /help · /reset (lupain obrolan sebelumnya)`;
 };
 
-const groupIntro = () => {
+const groupIntro = (jid: string) => {
   const { botName, retentionDays, owner } = loadConfig();
+  const members = answersMembers(store.getGroup(jid))
+    ? `\n\nKalian juga bisa *nanya apa aja ke gue*: tag gue, bales pesan gue, atau awali dengan /ai. Pertanyaannya dikirim ke penyedia AI, dan gue gak bisa baca isi obrolan grup ini buat kalian.`
+    : "";
   return `Halo semua 👋 Gue *${botName}*, asisten pribadi${owner?.name ? ` punya *${owner.name}*` : ""}.
 
-Gue *mencatat pesan di grup ini* buat bikin rangkuman dan ngabarin dia kalau dia di-mention. Kalau dia nyalain fitur baca gambar, gambar di grup ini juga dibaca AI dan dicatat sebagai teks. Catatan disimpan di perangkat dia sendiri dan otomatis terhapus setelah ${retentionDays} hari.
+Gue *mencatat pesan di grup ini* buat bikin rangkuman dan ngabarin dia kalau dia di-mention. Kalau dia nyalain fitur baca gambar, gambar di grup ini juga dibaca AI dan dicatat sebagai teks. Catatan disimpan di perangkat dia sendiri dan otomatis terhapus setelah ${retentionDays} hari.${members}
 
 Admin grup bisa ngeluarin gue kapan aja, atau ketik *@${botName} keluar*. Semua catatan grup ini bakal ikut dihapus.`;
 };
@@ -164,7 +169,85 @@ async function handleGroup(m: IncomingMessage, fromOwner: boolean) {
 
   if (/^(keluar|\/keluar|leave)$/i.test(text)) return handleLeave(m);
   if (fromOwner) return handleCommand(m, text);
-  // Orang lain nge-tag bot: diabaikan
+  // Orang lain nge-tag bot: dijawab AI anggota kalau owner nyalain buat grup ini, selain itu diabaikan
+  if (hasOwner() && answersMembers(chat)) queueMemberAnswer(m, text, chat?.name ?? null);
+}
+
+// ---------- AI buat anggota grup (v0.4.0) ----------
+
+/** Jeda minimal antar balasan di grup yang sama, biar nomor bot gak dianggap spam (F4.3). */
+export const memberReplyGap = { ms: 3000 };
+const MAX_ANSWER = 3000;
+const memberQueues = new Map<string, Promise<void>>();
+const lastMemberReply = new Map<string, number>();
+const toldQuotaFull = new Set<string>();
+let memberAiFailing = false;
+
+/** Tunggu semua jawaban buat anggota selesai dikirim (dipakai tes). */
+export const memberJobsIdle = () => Promise.all([...memberQueues.values()]);
+
+/** Pertanyaan anggota dijawab berurutan per grup, di belakang (pesan lain gak perlu nunggu). */
+function queueMemberAnswer(m: IncomingMessage, text: string, groupName: string | null) {
+  const prev = memberQueues.get(m.chatJid) ?? Promise.resolve();
+  const job = prev.then(() => answerMember(m, text, groupName)).catch((e) => console.error("Gagal jawab anggota:", e));
+  memberQueues.set(m.chatJid, job);
+  void job.finally(() => {
+    if (memberQueues.get(m.chatJid) === job) memberQueues.delete(m.chatJid);
+  });
+}
+
+/** Cek jatah harian. Null = boleh; string = balasan "jatah habis" (dikirim sekali); "" = diem aja. */
+function memberQuota(m: IncomingMessage): string | null {
+  const { memberReplies: c, timezone } = loadConfig();
+  const day = localDate(nowTs(), timezone);
+  const sender = m.senderIds[0];
+  const full =
+    (c.perGroupDaily !== null && store.memberUsageCount(day, m.chatJid) >= c.perGroupDaily && "group") ||
+    (c.perPersonDaily !== null && store.memberUsageCount(day, m.chatJid, sender) >= c.perPersonDaily && "person");
+  if (!full) return null;
+  const key = `${day}|${m.chatJid}|${full === "group" ? "" : sender}`;
+  if (toldQuotaFull.has(key)) return "";
+  toldQuotaFull.add(key);
+  return full === "group" ? "Jatah tanya grup ini hari ini udah habis, besok lagi ya." : "Jatah tanya lo hari ini udah habis, besok lagi ya.";
+}
+
+async function answerMember(m: IncomingMessage, text: string, groupName: string | null) {
+  const wait = (lastMemberReply.get(m.chatJid) ?? 0) + memberReplyGap.ms - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  const reply = async (t: string) => {
+    await sendText(m.chatJid, t, m.raw);
+    lastMemberReply.set(m.chatJid, Date.now());
+  };
+
+  const quota = memberQuota(m);
+  if (quota !== null) return quota ? reply(quota) : undefined;
+  const quoted = m.quotedText ? { text: m.quotedText, fromBot: isBotId(m.quotedSenderId) } : null;
+  if (!text && !quoted) return reply("Mau nanya apa? Tag gue sambil tulis pertanyaannya, atau awali dengan /ai.");
+
+  const { timezone, memberReplies } = loadConfig();
+  const sender = m.senderName ?? "Anggota";
+  try {
+    await showTyping(m.chatJid);
+    let answer = await askMember(m.chatJid, groupName, { sender, text: text || "(tolong tanggapi pesan yang gue bales ini)", quoted });
+    if (!answer) answer = "Hmm, gue gak dapet jawaban. Coba tanya dengan kalimat lain ya.";
+    if (answer.length > MAX_ANSWER) answer = `${answer.slice(0, MAX_ANSWER).trimEnd()}…\n\n_(jawabannya dipotong karena kepanjangan)_`;
+    await reply(answer);
+    store.addMemberUsage(localDate(nowTs(), timezone), m.chatJid, m.senderIds[0]);
+    memberAiFailing = false;
+  } catch (e) {
+    const detail = e instanceof Error ? e.message.slice(0, 200) : String(e);
+    console.error("Error dari AI anggota:", detail);
+    await reply("Lagi gak bisa jawab, coba lagi nanti ya.");
+    // Owner dikabarin sekali, terus diem sampai AI anggota jalan normal lagi (F3.5)
+    if (!memberAiFailing) {
+      memberAiFailing = true;
+      const llm = memberReplies.llm;
+      await sendToOwner(
+        `⚠️ AI buat anggota grup (${llm?.provider} / ${llm?.model}) error, jadi pertanyaan anggota di *${groupName ?? "grup"}* gak kejawab.\n_${detail}_\n\nCek API key/kreditnya, atau ganti modelnya. Gue gak ngabarin lagi sampai AI-nya jalan normal.`,
+        "other",
+      ).catch(() => undefined);
+    }
+  }
 }
 
 // ---------- Gambar ----------
@@ -253,7 +336,7 @@ async function handleCommand(m: IncomingMessage, text: string) {
 }
 
 export async function introduceToGroup(jid: string) {
-  await sendText(jid, groupIntro());
+  await sendText(jid, groupIntro(jid));
 }
 
 export const pairingInfo = () =>

@@ -16,6 +16,17 @@ export type LLMConfig = {
   baseUrl?: string;
 };
 
+/** AI buat anggota grup (v0.4.0): jawab siapa aja di grup, tanpa tool. */
+export type MemberReplies = {
+  /** Jawab anggota di semua grup (bisa diubah per grup) */
+  enabled: boolean;
+  /** Provider, key, & model sendiri. API key kosong + provider sama kayak owner = pakai key owner. */
+  llm: LLMConfig | null;
+  /** Jatah pertanyaan per hari; null = tanpa batas */
+  perPersonDaily: number | null;
+  perGroupDaily: number | null;
+};
+
 export type Config = {
   llm: LLMConfig;
   botName: string;
@@ -42,6 +53,7 @@ export type Config = {
   taskOffers: boolean;
   /** Gambar di grup dibaca AI (bisa diubah per grup) */
   readImages: boolean;
+  memberReplies: MemberReplies;
 };
 
 const DEFAULTS: Omit<Config, "llm"> = {
@@ -52,6 +64,7 @@ const DEFAULTS: Omit<Config, "llm"> = {
   checkUpdates: true,
   taskOffers: true,
   readImages: false,
+  memberReplies: { enabled: false, llm: null, perPersonDaily: null, perGroupDaily: null },
 };
 
 let current: Config | null = null;
@@ -77,6 +90,12 @@ export function saveConfig(next: Config) {
 
 export function updateConfig(patch: Partial<Config>) {
   saveConfig({ ...loadConfig(), ...patch });
+}
+
+/** AI anggota yang siap dipakai: API key kosong diisi key owner kalau provider-nya sama. */
+export function withOwnerKey(llm: LLMConfig): LLMConfig {
+  const owner = loadConfig().llm;
+  return !llm.apiKey && llm.provider === owner.provider ? { ...llm, apiKey: owner.apiKey } : llm;
 }
 
 export const newConfig = (llm: LLMConfig, extra: Partial<Config> = {}): Config => ({ ...DEFAULTS, ...extra, llm });

@@ -29,7 +29,7 @@ Patokan sukses:
 
 | # | Requirement |
 |---|---|
-| F2.1 | AI terpisah dari AI owner (`agent/public.ts`): **tanpa tool sama sekali**. Gak bisa baca catatan grup, cari pesan, bikin reminder, atau ngubah pengaturan. |
+| F2.1 | AI terpisah dari AI owner (`agent/member.ts`): **tanpa tool sama sekali**. Gak bisa baca catatan grup, cari pesan, bikin reminder, atau ngubah pengaturan. |
 | F2.2 | Prompt sendiri: Japri ngenalin diri sebagai asisten AI umum di grup ini, jawab singkat pakai format WhatsApp, dan kalau ditanya soal isi obrolan grup atau minta dirangkum, jawab jujur kalau itu cuma bisa diminta owner. |
 | F2.3 | Riwayat obrolan **per grup**, terpisah dari riwayat owner, jadi anggota bisa nanya lanjutan (_"terus yang kedua gimana?"_). Isinya cuma tanya jawab anggota dengan Japri di grup itu, dibatasi **10 giliran terakhir atau 2 jam terakhir**, mana yang lebih pendek. |
 | F2.4 | Kalau anggota bales pesan orang lain sambil nge-tag Japri (_"@Japri ini maksudnya apa?"_), pesan yang dibales ikut dikirim sebagai konteks. Itu satu-satunya isi grup yang dilihat AI anggota. |
@@ -40,7 +40,7 @@ Patokan sukses:
 
 | # | Requirement |
 |---|---|
-| F3.1 | AI anggota punya pengaturan sendiri: **provider, API key, base URL, dan model**, disimpan di `publicReplies.llm`, terpisah dari `llm` milik owner. |
+| F3.1 | AI anggota punya pengaturan sendiri: **provider, API key, base URL, dan model**, disimpan di `memberReplies.llm`, terpisah dari `llm` milik owner. |
 | F3.2 | Kalau provider-nya sama dengan owner, API key boleh dikosongin: key owner yang dipakai (ikut berubah kalau key owner diganti). |
 | F3.3 | Pas disimpan, model dites dulu: cukup bisa jawab satu pesan (gak perlu tool calling). Jadi model gratis atau lokal (mis. OpenRouter `:free`, Ollama) bisa dipakai. Gagal tes = gak disimpan. |
 | F3.4 | Mode F1 **gak bisa dinyalain** sebelum AI anggota diatur dan lolos tes. Japri bilang ke owner apa yang kurang. |
@@ -54,8 +54,8 @@ Patokan sukses:
 | F4.2 | Owner bisa nyalain jatah kalau perlu (default mati): maksimal pertanyaan per orang per hari dan/atau per grup per hari. Lewat jatah = dibales sekali _"Jatah tanya hari ini udah habis, besok lagi ya."_, terus dicuekin sampai besok. |
 | F4.3 | **Jeda pengaman** biar nomor bot gak rawan diblokir WhatsApp: tiap grup dijawab berurutan (satu pertanyaan selesai baru yang berikutnya), dengan jeda minimal **3 detik** antar balasan di grup yang sama. Ini bukan jatah; semua pertanyaan tetap dijawab, cuma gak beruntun. |
 | F4.4 | Jawaban dipotong kalau kepanjangan (batas karakter wajar buat WhatsApp), dengan tanda kalau dipotong. |
-| F4.5 | Pemakaian dihitung per grup per hari (jumlah pertanyaan yang dijawab, plus token kalau provider ngasih). Ditampilin di Pengaturan dan bisa ditanya owner: _"AI anggota kepake berapa minggu ini?"_. |
-| F4.6 | Japri gak pernah ngebales pesan dari bot lain atau dari dirinya sendiri, biar gak muter-muter. |
+| F4.5 | Pemakaian dihitung per grup per hari (jumlah pertanyaan yang dijawab). Ditampilin di Pengaturan dan bisa ditanya owner: _"AI anggota kepake berapa minggu ini?"_. |
+| F4.6 | Japri gak pernah ngebales pesannya sendiri, biar gak muter-muter. Bot lain cuma dijawab kalau dia nge-tag Japri, dan tetap kena jeda & jatah. |
 
 ### F5. Pengaturan
 

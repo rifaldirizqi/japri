@@ -5,6 +5,11 @@ dan ringkasannya dikirim ke owner lewat WhatsApp waktu ada update.
 
 Format tiap versi: `## [x.y.z] - YYYY-MM-DD`, terus daftar poin (`- ...`) pakai bahasa yang dimengerti user awam.
 
+## [Belum dirilis]
+
+- Jawab anggota grup (opsional): _"jawab semua orang di grup kantor"_, terus anggota grup bisa nanya apa aja ke Japri dengan nge-tag, bales pesan Japri, atau awali dengan /ai. Pakai AI terpisah yang gak bisa baca catatan grup, dan penyedia/API key-nya bisa beda dari punya lo. Default mati, tanpa batas, bisa dikasih jatah per orang atau per grup
+- Windows: jendela Pengaturan buat Japri yang lagi jalan. Ganti AI, nama panggilan, jam tenang, rangkuman otomatis, notif per grup, dan lainnya, langsung kepakai tanpa restart
+
 ## [0.3.1] - 2026-10-25
 
 - Windows: setup sekarang pakai jendela wizard kayak aplikasi Windows biasa, ada tombol Kembali, Lanjut, dan Batal. Dari pilih AI sampai scan QR WhatsApp, semuanya di satu jendela, gak pakai layar hitam lagi

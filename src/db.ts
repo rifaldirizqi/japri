@@ -77,6 +77,15 @@ CREATE TABLE IF NOT EXISTS offers (
   created_ts INTEGER NOT NULL,
   open       INTEGER NOT NULL DEFAULT 1
 );
+
+-- Pertanyaan anggota grup yang dijawab AI anggota, per hari (v0.4.0)
+CREATE TABLE IF NOT EXISTS member_usage (
+  day      TEXT NOT NULL,      -- YYYY-MM-DD, zona waktu owner
+  chat_jid TEXT NOT NULL,
+  sender   TEXT NOT NULL,
+  count    INTEGER NOT NULL,
+  PRIMARY KEY (day, chat_jid, sender)
+);
 `);
 
 // ---------- Migrasi dari versi lama ----------
@@ -91,6 +100,8 @@ addColumn("chats", "caught_up_ts", "INTEGER"); // catch-up/digest terakhir yang 
 addColumn("messages", "for_owner", "INTEGER NOT NULL DEFAULT 0"); // pesan yang nge-tag/bales/nyebut owner
 // v0.3.0
 addColumn("chats", "read_images", "INTEGER"); // null = ikut pengaturan umum, 1/0 = khusus grup ini
+// v0.4.0
+addColumn("chats", "member_replies", "INTEGER"); // jawab anggota grup: null = ikut pengaturan umum, 1/0 = khusus grup ini
 
 export type NotifyMode = "all" | "mentions" | "off";
 export type Chat = {
@@ -99,6 +110,7 @@ export type Chat = {
   notify_mode: NotifyMode;
   caught_up_ts: number | null;
   read_images: number | null;
+  member_replies: number | null;
 };
 export type StoredMessage = {
   id: string;
@@ -131,6 +143,9 @@ export const listGroups = () => db.prepare(`SELECT * FROM chats ORDER BY name`).
 export const setReadImages = (jid: string, value: number | null) =>
   db.prepare(`UPDATE chats SET read_images = ? WHERE jid = ?`).run(value, jid);
 
+export const setMemberReplies = (jid: string, value: number | null) =>
+  db.prepare(`UPDATE chats SET member_replies = ? WHERE jid = ?`).run(value, jid);
+
 export const setNotifyMode = (jid: string, mode: NotifyMode) =>
   db.prepare(`UPDATE chats SET notify_mode = ? WHERE jid = ?`).run(mode, jid);
 
@@ -152,6 +167,7 @@ export function retainGroups(jids: string[]) {
 /** Bot keluar / dikeluarkan: hapus semua data grup itu. */
 export const forgetGroup = transaction((jid: string) => {
   db.prepare(`DELETE FROM messages WHERE chat_jid = ?`).run(jid);
+  db.prepare(`DELETE FROM member_usage WHERE chat_jid = ?`).run(jid);
   db.prepare(`UPDATE reminders SET done = 1 WHERE target_jid = ? AND done = 0`).run(jid);
   db.prepare(`DELETE FROM chats WHERE jid = ?`).run(jid);
 });
@@ -274,3 +290,26 @@ export function incrementCounter(key: string, max: number): boolean {
 /** Hapus penghitung lama (key diawali `prefix`, selain `keep`). */
 export const pruneCounters = (prefix: string, keep: string) =>
   db.prepare(`DELETE FROM counters WHERE key LIKE ? AND key != ?`).run(`${prefix}%`, keep);
+
+// ---------- Pemakaian AI anggota ----------
+
+export const addMemberUsage = (day: string, chatJid: string, sender: string) =>
+  db
+    .prepare(`INSERT INTO member_usage (day, chat_jid, sender, count) VALUES (?, ?, ?, 1) ON CONFLICT DO UPDATE SET count = count + 1`)
+    .run(day, chatJid, sender);
+
+/** Jumlah pertanyaan yang dijawab hari itu di grup itu (semua orang, atau satu orang). */
+export function memberUsageCount(day: string, chatJid: string, sender?: string): number {
+  const row = sender
+    ? db.prepare(`SELECT SUM(count) AS n FROM member_usage WHERE day = ? AND chat_jid = ? AND sender = ?`).get(day, chatJid, sender)
+    : db.prepare(`SELECT SUM(count) AS n FROM member_usage WHERE day = ? AND chat_jid = ?`).get(day, chatJid);
+  return (row as { n: number | null }).n ?? 0;
+}
+
+/** Total per grup sejak `fromDay` (inklusif). */
+export const memberUsageSince = (fromDay: string) =>
+  db
+    .prepare(`SELECT chat_jid, SUM(count) AS count FROM member_usage WHERE day >= ? GROUP BY chat_jid`)
+    .all(fromDay) as { chat_jid: string; count: number }[];
+
+export const pruneMemberUsage = (beforeDay: string) => db.prepare(`DELETE FROM member_usage WHERE day < ?`).run(beforeDay);
