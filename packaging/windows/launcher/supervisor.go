@@ -21,6 +21,8 @@ const (
 	createNoWindow = 0x08000000
 	statusPrefix   = "@@japri-status "
 	infoPrefix     = "@@japri-info "
+	settingsPrefix = "@@japri-settings-url "
+	commandPrefix  = "@@japri-command "
 	maxLogSize     = 2 << 20 // 2 MB, sisanya pindah ke japri.log.1
 
 	crashLimit  = 3               // gagal 3× ...
@@ -244,6 +246,16 @@ func (s *supervisor) startBot() (<-chan int, error) {
 				}
 				continue
 			}
+			if strings.HasPrefix(line, settingsPrefix) {
+				s.t.setSettingsURL(strings.TrimSpace(line[len(settingsPrefix):]))
+				continue
+			}
+			if strings.HasPrefix(line, commandPrefix) {
+				if strings.TrimSpace(line[len(commandPrefix):]) == "setup" {
+					s.command(menuSetup) // dari tombol "Setup ulang" di jendela Pengaturan
+				}
+				continue
+			}
 			writeLogLine(logf, line)
 			s.t.appendLog(line)
 		}
@@ -252,6 +264,7 @@ func (s *supervisor) startBot() (<-chan int, error) {
 		r.Close()
 		logf.Close()
 		s.setPid(0)
+		s.t.setSettingsURL("") // halaman Pengaturan ikut mati bareng bot
 		done <- cmd.ProcessState.ExitCode()
 	}()
 	return done, nil

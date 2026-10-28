@@ -107,15 +107,18 @@ func main() {
 	if len(os.Args) > 1 {
 		arg = os.Args[1]
 	}
-	if arg == "__setup" || arg == "__console" {
-		mode := ""
+	if arg == "__setup" || arg == "__console" || arg == "__settings" {
+		next := ""
 		if len(os.Args) > 2 {
-			mode = os.Args[2]
+			next = os.Args[2]
 		}
-		if arg == "__console" {
-			os.Exit(runConsole(p, mode))
+		switch arg {
+		case "__console":
+			os.Exit(runConsole(p, next))
+		case "__settings":
+			os.Exit(runSettings(p, next))
 		}
-		os.Exit(runSetup(p, mode))
+		os.Exit(runSetup(p, next))
 	}
 
 	// Satu Japri aja. Kalau udah ada, kabarin yang lama (dia yang nampilin notifikasi / buka setup).
@@ -123,8 +126,11 @@ func main() {
 	if _, _, e := procCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(utf16Ptr(`Local\JapriTray`)))); e == syscall.Errno(errorAlreadyExists) {
 		if h := findRunning(); h != 0 && arg != "--tray" {
 			msg := uintptr(wmShowRunning)
-			if arg == "setup" {
+			switch arg {
+			case "setup":
 				msg = wmRunSetup
+			case "settings":
+				msg = wmOpenSettings
 			}
 			procAllowSetForegroundWindow.Call(^uintptr(0)) // ASFW_ANY: biar jendela Japri yang lama boleh maju ke depan
 			procPostMessageW.Call(h, msg, 0, 0)

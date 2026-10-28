@@ -63,10 +63,12 @@ Source: "{#Stage}\app\*"; DestDir: "{app}\app"; Flags: ignoreversion recursesubd
 
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\app"
+; Shortcut lama (sebelum v0.3.2), diganti "Japri - Pengaturan"
+Type: files; Name: "{autoprograms}\Japri - Ganti pengaturan AI.lnk"
 
 [Icons]
 Name: "{autoprograms}\Japri"; Filename: "{app}\Japri.exe"; IconFilename: "{app}\japri.ico"; Comment: "Jalankan Japri"
-Name: "{autoprograms}\Japri - Ganti pengaturan AI"; Filename: "{app}\Japri.exe"; Parameters: "setup"; IconFilename: "{app}\japri.ico"
+Name: "{autoprograms}\Japri - Pengaturan"; Filename: "{app}\Japri.exe"; Parameters: "settings"; IconFilename: "{app}\japri.ico"
 Name: "{autoprograms}\Japri - Buka folder data"; Filename: "{win}\explorer.exe"; Parameters: """{localappdata}\Japri\data"""
 Name: "{autodesktop}\Japri"; Filename: "{app}\Japri.exe"; IconFilename: "{app}\japri.ico"; Tasks: desktopicon
 Name: "{userstartup}\Japri"; Filename: "{app}\Japri.exe"; IconFilename: "{app}\japri.ico"; Parameters: "--tray"; Tasks: autostart

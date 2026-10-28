@@ -1,12 +1,13 @@
 import { configExists, loadConfig } from "./config.js";
 import { handleMessage, hasOwner, introduceToGroup, pairingInfo, setupCode, whenOwnerClaimed } from "./bot.js";
-import { acquireSingleInstanceLock, isDesktop, reportInfo } from "./desktop.js";
+import { acquireSingleInstanceLock, isDesktop, isTray, reportInfo } from "./desktop.js";
 import { startScheduler } from "./scheduler.js";
+import { startSettingsServer } from "./setup/settings-web.js";
 import { startSetupServer } from "./setup/web.js";
 import { runWizard } from "./setup/wizard.js";
 import { botNumber, connect } from "./wa/client.js";
 
-// `setup` = jalanin wizard, sambungin WA, klaim owner, terus keluar (dipakai di Docker & shortcut "Ganti pengaturan AI").
+// `setup` = jalanin wizard, sambungin WA, klaim owner, terus keluar (dipakai di Docker & "Setup ulang" di Windows).
 // `pair`  = kayak setup tapi tanpa wizard: cuma sambungin WA + klaim owner (dipakai Japri.exe kalau setup sempat kepotong).
 // Tanpa argumen = jalan terus; wizard otomatis muncul kalau belum pernah setup.
 const pairOnly = process.argv[2] === "pair";
@@ -33,7 +34,7 @@ process.on("SIGTERM", () => process.exit(0));
 if (isDesktop && !acquireSingleInstanceLock()) {
   console.log(
     "ℹ️  Japri udah jalan (cek ikon Japri di system tray, pojok kanan bawah).\n" +
-      (setupOnly ? "   Pakai tombol \"Ganti pengaturan AI\" di jendela Japri.\n" : ""),
+      (setupOnly ? "   Pakai tombol \"Pengaturan\" di jendela Japri.\n" : ""),
   );
   process.exit(2);
 }
@@ -59,6 +60,15 @@ if (webSetup) {
   } else {
     await waitForConfig();
   }
+}
+
+// Japri.exe: jendela Pengaturan dilayani proses ini, jadi perubahan langsung kepakai tanpa restart
+if (isTray && !setupOnly) {
+  const settings = await startSettingsServer({
+    botNumber,
+    onResetup: () => process.stdout.write("@@japri-command setup\n"), // Japri.exe yang buka jendela setup
+  });
+  process.stdout.write(`@@japri-settings-url ${settings.url}\n`);
 }
 
 let readyOnce = false;

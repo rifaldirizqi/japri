@@ -6,6 +6,7 @@ package main
 import (
 	_ "embed"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
@@ -28,9 +29,10 @@ const (
 	wmTrayCallback = wmApp + 1 // event mouse dari ikon tray
 	wmTrayRefresh  = wmApp + 2 // status berubah (dikirim dari goroutine lain)
 	wmShowRunning  = wmApp + 3 // Japri.exe dibuka lagi padahal udah jalan
-	wmRunSetup     = wmApp + 4 // shortcut "Ganti pengaturan AI" dibuka padahal udah jalan
+	wmRunSetup     = wmApp + 4 // Japri.exe setup dibuka padahal udah jalan
 	wmLogAppend    = wmApp + 5 // ada baris log baru
 	wmShowMain     = wmApp + 6 // buka jendela Japri
+	wmOpenSettings = wmApp + 7 // shortcut "Japri - Pengaturan" dibuka padahal udah jalan
 
 	menuOpen = iota + 1
 	menuSetup
@@ -38,6 +40,7 @@ const (
 	menuQuit
 	menuRetry
 	menuQR
+	menuSettings
 )
 
 type state int
@@ -79,6 +82,7 @@ type tray struct {
 	pending    *balloon
 	logBuf     []string // baris terakhir buat jendela Japri
 	logPending []string // belum ditempel ke jendela
+	settings   string   // alamat halaman Pengaturan dari bot yang lagi jalan ("" kalau bot gak jalan)
 
 	taskbarCreated uint32
 }
@@ -189,6 +193,26 @@ func (t *tray) snapshot() (state, botInfo) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.st, t.info
+}
+
+func (t *tray) setSettingsURL(url string) {
+	t.mu.Lock()
+	t.settings = url
+	t.mu.Unlock()
+}
+
+// openSettings buka jendela Pengaturan. Kalau bot lagi gak jalan (mis. error terus), buka setup aja.
+func (t *tray) openSettings() {
+	t.mu.Lock()
+	url := t.settings
+	t.mu.Unlock()
+	if url == "" {
+		t.onCmd(menuSetup)
+		return
+	}
+	if err := exec.Command(t.paths.exe, "__settings", url).Start(); err != nil {
+		messageBox("Japri", "Gagal buka Pengaturan: "+err.Error())
+	}
 }
 
 // showMain buka jendela Japri (aman dari goroutine mana aja).
@@ -309,7 +333,7 @@ func (t *tray) showMenu() {
 		add(mfString, menuRetry, "Coba jalanin lagi")
 	}
 	if s != stSetup {
-		add(mfString, menuSetup, "Ganti pengaturan AI")
+		add(mfString, menuSettings, "Pengaturan")
 	}
 	add(mfString, menuDataDir, "Buka folder data")
 	add(mfSeparator, 0, "")
@@ -334,6 +358,8 @@ func (t *tray) showMenu() {
 		if confirmQuit(0) {
 			t.onCmd(menuQuit)
 		}
+	case menuSettings:
+		t.openSettings()
 	case menuSetup, menuRetry:
 		t.onCmd(int(cmd))
 	}
@@ -376,6 +402,9 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 		return 0
 	case msg == wmRunSetup:
 		t.onCmd(menuSetup)
+		return 0
+	case msg == wmOpenSettings:
+		t.openSettings()
 		return 0
 	case msg == uintptr(t.taskbarCreated) && t.taskbarCreated != 0:
 		t.added = false

@@ -1,17 +1,17 @@
 import { z } from "zod";
 import { loadConfig, updateConfig } from "../config.js";
 import * as store from "../db.js";
-import { defineTool, testToolCalling } from "../llm/index.js";
-import { reportInfo } from "../desktop.js";
+import { defineTool } from "../llm/index.js";
 import { catchupPrompt, collectCatchup, commitCatchup, transcript } from "../catchup.js";
 import { acceptOffer } from "../tasks.js";
-import { DAY_NAMES, digestHandledNow } from "../digest.js";
-import { MAX_IMAGES_PER_DAY, readsImages, testVision } from "../vision.js";
+import { DAY_NAMES } from "../digest.js";
+import { MAX_IMAGES_PER_DAY } from "../vision.js";
 import { installUpdate } from "../selfupdate.js";
 import { ownerJid } from "../notify.js";
 import { sendText } from "../wa/client.js";
-import { formatMinutes, formatTs, isValidTimezone, nowTs, parseHM } from "../time.js";
+import { formatTs, nowTs } from "../time.js";
 import { checkForUpdate, currentVersion, updateMessage } from "../updater.js";
+import * as settings from "../settings.js";
 
 function resolveGroup(query: string, current?: store.Chat): store.Chat | string {
   if (query === "current") return current ?? "Perintah ini gak dikirim dari grup. Tanyakan grup yang mana.";
@@ -223,20 +223,21 @@ export function buildTools(current?: store.Chat) {
         const c = loadConfig();
         const changes: string[] = [];
         if (input.nicknames) {
-          updateConfig({ nicknames: input.nicknames.map((n) => n.trim().toLowerCase()).filter(Boolean) });
+          settings.setNicknames(input.nicknames);
           changes.push("nama panggilan");
         }
         if (input.timezone) {
-          if (!isValidTimezone(input.timezone)) return `Zona waktu "${input.timezone}" gak dikenal.`;
-          updateConfig({ timezone: input.timezone });
+          const rejected = settings.setTimezone(input.timezone);
+          if (rejected) return rejected;
           changes.push("zona waktu");
         }
         if (input.bot_name) {
-          updateConfig({ botName: input.bot_name });
+          const rejected = settings.setBotName(input.bot_name);
+          if (rejected) return rejected;
           changes.push("nama bot");
         }
         if (input.retention_days) {
-          updateConfig({ retentionDays: input.retention_days });
+          settings.setRetentionDays(input.retention_days);
           changes.push("lama simpan pesan");
         }
         if (input.check_updates !== undefined) {
@@ -248,11 +249,8 @@ export function buildTools(current?: store.Chat) {
           changes.push(`saran reminder (${input.task_offers ? "nyala" : "mati"})`);
         }
         if (input.model && input.model !== c.llm.model) {
-          const candidate = { ...c.llm, model: input.model };
-          const test = await testToolCalling(candidate);
-          if (!test.ok) return `Model "${input.model}" gak bisa dipakai: ${test.detail}. Pengaturan lain ${changes.length ? "tetap disimpan" : "gak berubah"}.`;
-          updateConfig({ llm: candidate });
-          reportInfo({ ai: `${candidate.provider} / ${candidate.model}` });
+          const rejected = await settings.setLLM({ ...c.llm, model: input.model });
+          if (rejected) return `Model "${input.model}" gak bisa dipakai: ${rejected}. Pengaturan lain ${changes.length ? "tetap disimpan" : "gak berubah"}.`;
           changes.push(`model (sekarang ${input.model})`);
         }
         return changes.length ? `Disimpan: ${changes.join(", ")}.` : "Gak ada yang diubah.";
@@ -294,16 +292,11 @@ export function buildTools(current?: store.Chat) {
         weekdays_only: z.boolean().default(false).describe("true = cuma Senin–Jumat"),
       }),
       run: async ({ time, weekdays_only }) => {
-        if (time === null) {
-          updateConfig({ digest: null });
-          return "Digest harian dimatiin.";
-        }
-        const minutes = parseHM(time);
-        if (minutes === null) return `Jam "${time}" gak valid. Pakai format HH:MM.`;
-        updateConfig({ digest: { time: formatMinutes(minutes), weekdaysOnly: weekdays_only } });
-        // Jadwal yang udah lewat gak dikirim mendadak; mulai dari jadwal berikutnya
-        updateConfig({ digestHandledTs: digestHandledNow("daily", loadConfig(), nowTs()) });
-        return `Digest harian nyala: ${weekdays_only ? "Senin–Jumat" : "tiap hari"} jam ${formatMinutes(minutes)}. Kalau gak ada obrolan baru, gak dikirim.`;
+        const rejected = settings.setDigest(time, weekdays_only);
+        if (rejected) return rejected;
+        const d = loadConfig().digest;
+        if (!d) return "Digest harian dimatiin.";
+        return `Digest harian nyala: ${weekdays_only ? "Senin–Jumat" : "tiap hari"} jam ${d.time}. Kalau gak ada obrolan baru, gak dikirim.`;
       },
     }),
 
@@ -315,16 +308,12 @@ export function buildTools(current?: store.Chat) {
         time: hmInput("Jam kirim").default("19:00"),
       }),
       run: async ({ day, time }) => {
-        if (day === null) {
-          updateConfig({ weeklyDigest: null });
-          return "Digest mingguan dimatiin.";
-        }
-        const minutes = parseHM(time);
-        if (minutes === null) return `Jam "${time}" gak valid. Pakai format HH:MM.`;
-        const dayIndex = DAY_NAMES.findIndex((d) => d.toLowerCase() === day);
-        updateConfig({ weeklyDigest: { day: dayIndex, time: formatMinutes(minutes) } });
-        updateConfig({ weeklyHandledTs: digestHandledNow("weekly", loadConfig(), nowTs()) });
-        return `Digest mingguan nyala: tiap ${DAY_NAMES[dayIndex]} jam ${formatMinutes(minutes)}.`;
+        const dayIndex = day === null ? null : DAY_NAMES.findIndex((d) => d.toLowerCase() === day);
+        const rejected = settings.setWeeklyDigest(dayIndex, time);
+        if (rejected) return rejected;
+        const w = loadConfig().weeklyDigest;
+        if (!w) return "Digest mingguan dimatiin.";
+        return `Digest mingguan nyala: tiap ${DAY_NAMES[w.day]} jam ${w.time}.`;
       },
     }),
 
@@ -353,15 +342,11 @@ export function buildTools(current?: store.Chat) {
         end: hmInput("Selesai").nullable(),
       }),
       run: async ({ start, end }) => {
-        if (start === null || end === null) {
-          updateConfig({ quietHours: null });
-          return "Jam tenang dimatiin. Notif yang lagi ditahan bakal dikirim bentar lagi.";
-        }
-        const s = parseHM(start);
-        const e = parseHM(end);
-        if (s === null || e === null || s === e) return "Jam mulai/selesai gak valid. Pakai format HH:MM dan jangan sama.";
-        updateConfig({ quietHours: { start: formatMinutes(s), end: formatMinutes(e) } });
-        return `Jam tenang: ${formatMinutes(s)}–${formatMinutes(e)}. Notif ditahan dan dikirim jadi satu pesan pas selesai; reminder tetap dikirim.`;
+        const rejected = settings.setQuietHours(start, end);
+        if (rejected) return rejected;
+        const q = loadConfig().quietHours;
+        if (!q) return "Jam tenang dimatiin. Notif yang lagi ditahan bakal dikirim bentar lagi.";
+        return `Jam tenang: ${q.start}–${q.end}. Notif ditahan dan dikirim jadi satu pesan pas selesai; reminder tetap dikirim.`;
       },
     }),
 
@@ -379,17 +364,9 @@ export function buildTools(current?: store.Chat) {
           if (typeof found === "string") return found;
           g = found;
         }
-        const alreadyOn = store.listGroups().some((x) => readsImages(x)) || loadConfig().readImages;
-        if (enabled && !alreadyOn) {
-          const test = await testVision(loadConfig().llm);
-          if (!test.ok) return `Model AI yang sekarang (${loadConfig().llm.model}) gak bisa baca gambar: ${test.detail}. Sarankan owner ganti ke model yang bisa baca gambar (mis. Claude, GPT-4o/5, Gemini). Pengaturan gak diubah.`;
-        }
-        if (g) {
-          store.setReadImages(g.jid, enabled ? 1 : 0);
-          return `Baca gambar di "${g.name}": ${enabled ? "nyala" : "mati"}.`;
-        }
-        updateConfig({ readImages: enabled });
-        for (const x of store.listGroups()) store.setReadImages(x.jid, null); // ikut pengaturan umum
+        const rejected = await settings.setImageReading(enabled, g?.jid);
+        if (rejected) return `${rejected}. Sarankan owner ganti ke model yang bisa baca gambar (mis. Claude, GPT-4o/5, Gemini). Pengaturan gak diubah.`;
+        if (g) return `Baca gambar di "${g.name}": ${enabled ? "nyala" : "mati"}.`;
         return `Baca gambar di semua grup: ${enabled ? `nyala (maks ${MAX_IMAGES_PER_DAY} gambar/hari; stiker & foto sekali lihat dilewati)` : "mati"}.`;
       },
     }),

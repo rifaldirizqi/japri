@@ -98,7 +98,7 @@ func newMainWindow(t *tray) (*mainWindow, error) {
 	static(idBot, w.fontUI)
 	static(idAI, w.fontUI)
 	static(idVersion, w.fontUI)
-	button(idBtnSetup, "Ganti pengaturan AI")
+	button(idBtnSetup, "Pengaturan")
 	button(idBtnData, "Buka folder data")
 	button(idBtnQR, "Buka halaman QR")
 	button(idBtnRetry, "Coba jalanin lagi")
@@ -188,7 +188,7 @@ func (w *mainWindow) layout() {
 	}{
 		{idBtnRetry, 150, s == stFailed},
 		{idBtnQR, 150, s == stQR},
-		{idBtnSetup, 170, true},
+		{idBtnSetup, 130, true},
 		{idBtnData, 150, true},
 	} {
 		if b.show {
@@ -315,7 +315,7 @@ func mainProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 	case wmCommand:
 		switch int(wParam & 0xFFFF) {
 		case idBtnSetup:
-			w.t.onCmd(menuSetup)
+			w.t.openSettings()
 		case idBtnData:
 			shellOpen(w.t.paths.data, "")
 		case idBtnQR:

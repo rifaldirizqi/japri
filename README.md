@@ -55,7 +55,9 @@ Kalau tadi opsi _"Jalankan otomatis"_ dicentang, Japri nyala sendiri tiap Window
 | Abu-abu | Lagi nyambung ke WhatsApp |
 | Ada tanda **!** merah | Butuh perhatian: perlu scan QR ulang, atau error terus. Muncul juga notifikasi Windows, dan tombol buat beresinnya di jendela Japri. |
 
-Kalau bot-nya crash, Japri nyalain ulang sendiri. Klik kanan ikon tray buat menu cepat: **Buka Japri**, **Ganti pengaturan AI**, **Buka folder data**, **Keluar**.
+Kalau bot-nya crash, Japri nyalain ulang sendiri. Klik kanan ikon tray buat menu cepat: **Buka Japri**, **Pengaturan**, **Buka folder data**, **Keluar**.
+
+**Pengaturan** (tombol di jendela Japri, menu tray, atau Start Menu → Japri - Pengaturan): ganti AI & API key, nama bot, nama panggilan, zona waktu, jam tenang, rangkuman otomatis, notif & baca gambar per grup, dan lainnya. Perubahan langsung kepakai tanpa restart. Mau sambungin ulang dari awal (mis. ganti nomor bot)? Pengaturan → Tentang → **Setup ulang**.
 
 ### Cara B — Docker
 
@@ -145,7 +147,7 @@ Mau ganti model? Bilang aja ke bot: _"ganti model ke claude-sonnet-5-5"_. Kalau 
 | Mau ngapain | Windows (installer) | Docker | Node |
 |---|---|---|---|
 | Lihat log | buka jendela Japri (log ada di bawah). Log lengkap: file `japri.log` di folder data | `docker compose logs -f` | lihat terminal / `pm2 logs` |
-| Ganti provider / API key | jendela Japri → **Ganti pengaturan AI** | `docker compose run --rm japri setup` → `docker compose up -d` | `npm run setup` |
+| Ganti provider / API key | jendela Japri → **Pengaturan** → AI | `docker compose run --rm japri setup` → `docker compose up -d` | `npm run setup` |
 | Update ke versi baru | bales *update* ke kabar versi baru dari Japri (atau jalanin installer versi baru; data tetap aman) | `docker compose pull && docker compose up -d` | `git pull && npm install`, terus restart |
 | Matiin kabar update | bilang ke bot: _"matiin cek update"_ | sama | sama |
 | Berhentiin bot | jendela Japri → **Keluar** (nutup jendela doang gak matiin bot) | `docker compose down` | Ctrl+C / `pm2 stop japri` |

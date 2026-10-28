@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pengaturan Japri</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f3f3f3;
+    --card: #ffffff;
+    --line: #e5e5e5;
+    --text: #1b1b1b;
+    --muted: #5d5d5d;
+    --accent: #0f7b4f;
+    --accent-hover: #0c6a44;
+    --accent-soft: #e8f4ee;
+    --danger: #c42b1c;
+    --danger-soft: #fdf3f2;
+    --field-line: #c8c8c8;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); display: flex; overflow: hidden; user-select: none;
+    font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  }
+  nav { width: 210px; flex: none; padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+  nav .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 16px; font-weight: 600; font-size: 15px; }
+  .logo { width: 30px; height: 30px; border-radius: 7px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  nav button {
+    all: unset; padding: 8px 12px; border-radius: 6px; cursor: pointer; position: relative;
+  }
+  nav button:hover { background: #eaeaea; }
+  nav button[aria-current=true] { background: #e6e6e6; font-weight: 600; }
+  nav button[aria-current=true]::before {
+    content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 2px; background: var(--accent);
+  }
+  main { flex: 1; overflow-y: auto; padding: 22px 28px 40px 8px; }
+  h1 { font-size: 24px; font-weight: 600; margin: 0 0 16px; }
+  h2 { font-size: 14px; font-weight: 600; margin: 22px 0 8px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12.5px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 4px; }
+  .row { display: flex; align-items: center; gap: 16px; padding: 14px 18px; min-height: 64px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row .label { flex: 1; min-width: 0; }
+  .row .label .title { display: block; }
+  .row .label .hint { display: block; color: var(--muted); font-size: 12.5px; }
+  .row .ctrl { display: flex; align-items: center; gap: 8px; flex: none; }
+  .stack { padding: 14px 18px; }
+  .stack + .row, .row + .stack { border-top: 1px solid var(--line); }
+
+  input[type=text], input[type=password], input[type=number], input[type=time], select {
+    font: inherit; height: 32px; padding: 0 10px; border-radius: 4px; user-select: text;
+    border: 1px solid var(--field-line); border-bottom-color: #8a8a8a; background: #fff; color: var(--text);
+  }
+  input:focus, select:focus { outline: none; border-bottom: 2px solid var(--accent); }
+  select[size] { height: auto; padding: 4px; }
+  select[size] option { padding: 3px 6px; border-radius: 3px; }
+  .field > span { display: block; margin-bottom: 4px; }
+  div.field { margin-bottom: 12px; }
+  input:disabled, select:disabled { background: #f7f7f7; color: #a0a0a0; }
+  .w-full { width: 100%; }
+  .w-md { width: 220px; }
+  .w-sm { width: 90px; }
+  label.field { display: block; margin-bottom: 12px; }
+  label.field > span { display: block; margin-bottom: 4px; }
+
+  button.btn {
+    font: inherit; min-width: 96px; height: 32px; padding: 0 14px; border-radius: 4px; cursor: pointer;
+    border: 1px solid #d1d1d1; background: #fdfdfd; color: var(--text);
+  }
+  button.btn:hover:not(:disabled) { background: #f5f5f5; }
+  button.btn:disabled { color: #a0a0a0; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+  button.primary:disabled { background: #c9c9c9; border-color: #c9c9c9; color: #fff; }
+  button.link { all: unset; color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+  /* Toggle ala Windows 11 */
+  .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+  .switch input { appearance: none; width: 40px; height: 20px; border-radius: 10px; margin: 0; cursor: pointer;
+    border: 1px solid #8a8a8a; background: #fff; position: relative; transition: background .15s; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%;
+    background: #5d5d5d; transition: transform .15s; }
+  .switch input:checked { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked::after { background: #fff; transform: translateX(20px); }
+  .switch span { min-width: 40px; color: var(--muted); }
+
+  .note { background: var(--accent-soft); border-radius: 6px; padding: 10px 12px; margin: 10px 0; }
+  .error { background: var(--danger-soft); color: var(--danger); border-radius: 6px; padding: 10px 12px; margin: 10px 0; user-select: text; }
+  .spin { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; margin-right: 8px;
+    border: 2px solid #c8c8c8; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 18px; border-top: 1px solid var(--line); }
+  th { font-weight: 600; font-size: 12.5px; color: var(--muted); border-top: 0; }
+  td.name { user-select: text; overflow-wrap: anywhere; }
+
+  #toast {
+    position: fixed; right: 20px; bottom: 18px; padding: 8px 14px; border-radius: 6px; background: #1b1b1b; color: #fff;
+    font-size: 13px; opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none; max-width: 60%;
+  }
+  #toast.show { opacity: 1; transform: none; }
+  #toast.bad { background: var(--danger); }
+</style>
+</head>
+<body>
+<nav id="nav">
+  <div class="brand"><div class="logo" aria-hidden="true">J</div>Pengaturan</div>
+</nav>
+<main id="content"><p><span class="spin"></span>Memuat…</p></main>
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.search).get("t");
+const content = document.getElementById("content");
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "x-japri-token": TOKEN, "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Error " + res.status);
+  return data;
+}
+
+/** Bikin elemen: h("p", {class: "x"}, "teks", anak...). Teks selalu lewat textContent (aman). */
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "value") el.value = v ?? "";
+    else if (v === true) el.setAttribute(k, "");
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of children.flat()) if (c != null && c !== false) el.append(c instanceof Node ? c : String(c));
+  return el;
+}
+
+let toastTimer;
+function toast(text, bad) {
+  const t = document.getElementById("toast");
+  t.textContent = text;
+  t.classList.toggle("bad", !!bad);
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), bad ? 5000 : 1600);
+}
+
+let S; // state dari server
+/** Simpan & render ulang halaman yang lagi kebuka. Kalau ditolak, tampilin alasannya & balikin nilainya. */
+async function save(path, body) {
+  try {
+    S = await api(path, body);
+    toast("Tersimpan");
+  } catch (e) {
+    toast(e.message, true);
+    S = await api("/api/state").catch(() => S);
+  }
+  render();
+}
+const saveSettings = (patch) => save("/api/settings", patch);
+
+// ---------- Komponen ----------
+const row = (title, hint, ...ctrl) =>
+  h("div", { class: "row" }, h("div", { class: "label" }, h("span", { class: "title" }, title), hint && h("span", { class: "hint" }, hint)),
+    h("div", { class: "ctrl" }, ...ctrl));
+const toggle = (on, onchange) =>
+  h("label", { class: "switch" }, h("span", {}, on ? "Nyala" : "Mati"), h("input", { type: "checkbox", checked: on, onchange: (e) => onchange(e.target.checked) }));
+const timeInput = (value, onchange, disabled) =>
+  h("input", { type: "time", value, disabled, onchange: (e) => e.target.value && onchange(e.target.value) });
+const select = (options, value, onchange, attrs) =>
+  h("select", { ...attrs, onchange: (e) => onchange(e.target.value) }, options.map(([v, label]) => h("option", { value: v, selected: String(v) === String(value) }, label)));
+
+// ---------- Bagian-bagian ----------
+const ai = { provider: null, baseUrl: "", apiKey: "", model: "", models: null, modelsFor: "", busy: false, error: "", lastBody: null };
+
+const pages = {
+  ai: {
+    label: "AI",
+    render() {
+      const cur = S.config.llm;
+      if (ai.provider === null) Object.assign(ai, { provider: cur.provider, baseUrl: cur.baseUrl || "", model: cur.model });
+      const p = S.providers.find((x) => x.id === ai.provider);
+      const keepsKey = ai.provider === cur.provider && cur.hasKey;
+      loadModels();
+      const changed = ai.provider !== cur.provider || ai.model !== cur.model || ai.apiKey !== "" || (p.needsBaseUrl && ai.baseUrl !== (cur.baseUrl || ""));
+      const providerLabel = (id) => S.providers.find((x) => x.id === id)?.label || id;
+      return [
+        h("p", { class: "muted" }, "Sekarang pakai ", h("b", {}, providerLabel(cur.provider).replace(/ \(.*\)$/, "") + " / " + cur.model), "."),
+        h("div", { class: "card" }, h("div", { class: "stack" },
+          h("label", { class: "field" }, h("span", {}, "Penyedia AI"),
+            select(S.providers.map((x) => [x.id, x.label]), ai.provider, (v) => {
+              const np = S.providers.find((x) => x.id === v);
+              Object.assign(ai, { provider: v, apiKey: "", model: v === cur.provider ? cur.model : "", error: "",
+                baseUrl: v === cur.provider ? (cur.baseUrl || "") : (np.baseUrl || "") });
+              render();
+            }, { class: "w-full" })),
+          p.needsBaseUrl && h("label", { class: "field" }, h("span", {}, "Alamat server (base URL)"),
+            h("input", { type: "text", class: "w-full", value: ai.baseUrl, spellcheck: "false", onchange: (e) => { ai.baseUrl = e.target.value.trim(); ai.error = ""; render(); } })),
+          p.asksApiKey && h("label", { class: "field" }, h("span", {}, p.needsKey ? "API key" : "API key (kosongin kalau gak perlu)"),
+            h("input", { type: "password", class: "w-full", value: ai.apiKey, autocomplete: "off", spellcheck: "false",
+              placeholder: keepsKey ? "Kosongin buat tetap pakai API key yang sekarang" : "",
+              onchange: (e) => { ai.apiKey = e.target.value.trim(); ai.error = ""; render(); } })),
+          p.keyHelp && h("p", { class: "small muted" }, "Belum punya? ",
+            h("button", { class: "link", onclick: () => api("/api/open", { url: p.keyHelp }).catch(() => {}) }, "Bikin API key di " + new URL(p.keyHelp).host + " ↗")),
+          modelPicker(),
+          ai.modelsError && h("p", { class: "small muted" }, "Daftar model gak bisa diambil: " + ai.modelsError.replace(/\.+$/, "") + ". Ketik nama modelnya manual."),
+          ai.error && h("div", { class: "error" }, h("b", {}, "Tes gagal: "), ai.error, h("br"),
+            h("button", { class: "link", onclick: () => saveAi(true) }, "Simpan aja tanpa tes"), " (Japri mungkin gak jalan bener)"),
+          h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:4px" },
+            h("button", { class: "btn primary", id: "aiSave", disabled: ai.busy || !changed || !ai.model || (p.needsKey && !keepsKey && ai.apiKey.length <= 10), onclick: () => saveAi(false) }, "Tes & simpan"),
+            changed && !ai.busy && h("button", { class: "btn", onclick: () => { ai.provider = null; ai.apiKey = ""; ai.error = ""; render(); } }, "Batal"),
+            ai.busy && h("span", { class: "muted" }, h("span", { class: "spin" }), "Ngetes koneksi & tool calling…")),
+        )),
+        h("p", { class: "small muted", style: "margin-top:10px" }, "Model baru dites dulu sebelum disimpan. API key cuma disimpan di komputer ini."),
+      ];
+    },
+  },
+
+  general: {
+    label: "Umum",
+    render() {
+      const c = S.config;
+      const known = S.timezones.some((t) => t.value === c.timezone);
+      return [
+        h("div", { class: "card" },
+          row("Nama bot", "Nama yang dipakai Japri waktu ngenalin diri.",
+            h("input", { type: "text", class: "w-md", value: c.botName, maxlength: 30, onchange: (e) => saveSettings({ botName: e.target.value }) })),
+          row("Nama panggilan lo", "Kalau disebut di grup, lo dapat notif. Pisahin pakai koma, mis. andi, ndi.",
+            h("input", { type: "text", class: "w-md", value: c.nicknames.join(", "), onchange: (e) => saveSettings({ nicknames: e.target.value }) })),
+          row("Zona waktu", "Dipakai buat reminder, jam tenang, dan rangkuman.",
+            select([...S.timezones.map((t) => [t.value, t.name]), ["__other", "Lainnya…"]], known ? c.timezone : "__other",
+              (v) => v === "__other" ? (S.config.timezone = "", render()) : saveSettings({ timezone: v }), { class: "w-md" })),
+          !known && row("Zona waktu lain", "Format IANA, mis. Asia/Singapore.",
+            h("input", { type: "text", class: "w-md", value: c.timezone, spellcheck: "false", onchange: (e) => saveSettings({ timezone: e.target.value }) })),
+          row("Simpan pesan grup", "Pesan yang lebih lama otomatis dihapus.",
+            h("input", { type: "number", class: "w-sm", min: 1, max: 365, value: c.retentionDays, onchange: (e) => saveSettings({ retentionDays: Number(e.target.value) }) }),
+            h("span", { class: "muted" }, "hari")),
+        ),
+      ];
+    },
+  },
+
+  notif: {
+    label: "Notifikasi",
+    render() {
+      const c = S.config;
+      const q = c.quietHours;
+      return [
+        h("div", { class: "card" },
+          row("Jam tenang", "Notif mention ditahan, terus dikirim jadi satu pesan pas jam tenang selesai. Reminder tetap dikirim.",
+            toggle(!!q, (on) => saveSettings({ quietHours: on ? { start: "22:00", end: "06:00" } : null }))),
+          q && row("Dari jam", "", timeInput(q.start, (v) => saveSettings({ quietHours: { start: v, end: q.end } })),
+            h("span", { class: "muted" }, "sampai"), timeInput(q.end, (v) => saveSettings({ quietHours: { start: q.start, end: v } }))),
+          row("Saran reminder", "Notif yang isinya tugas (\"kirim laporan Jumat ya\") ditambahin tawaran \"Mau gue ingetin?\".",
+            toggle(c.taskOffers, (on) => saveSettings({ taskOffers: on }))),
+        ),
+        h("p", { class: "small muted", style: "margin-top:10px" }, "Notif per grup (semua, cuma tag, atau mati) diatur di bagian Grup."),
+      ];
+    },
+  },
+
+  digest: {
+    label: "Rangkuman otomatis",
+    render() {
+      const c = S.config;
+      const d = c.digest, w = c.weeklyDigest;
+      return [
+        h("p", { class: "muted" }, "Rangkuman semua grup yang dikirim otomatis ke WhatsApp lo. Kalau gak ada obrolan baru, gak dikirim."),
+        h("div", { class: "card" },
+          row("Rangkuman harian", "", toggle(!!d, (on) => saveSettings({ digest: on ? { time: "21:00", weekdaysOnly: false } : null }))),
+          d && row("Jam kirim", "",
+            timeInput(d.time, (v) => saveSettings({ digest: { time: v, weekdaysOnly: !!d.weekdaysOnly } })),
+            select([["0", "Tiap hari"], ["1", "Senin–Jumat aja"]], d.weekdaysOnly ? "1" : "0", (v) => saveSettings({ digest: { time: d.time, weekdaysOnly: v === "1" } }))),
+        ),
+        h("div", { class: "card", style: "margin-top:14px" },
+          row("Rangkuman mingguan", "Gambaran besar 7 hari terakhir.", toggle(!!w, (on) => saveSettings({ weeklyDigest: on ? { day: 0, time: "19:00" } : null }))),
+          w && row("Kirim tiap", "",
+            select(S.days.map((name, i) => [String(i), name]), String(w.day), (v) => saveSettings({ weeklyDigest: { day: Number(v), time: w.time } })),
+            timeInput(w.time, (v) => saveSettings({ weeklyDigest: { day: w.day, time: v } }))),
+        ),
+      ];
+    },
+  },
+
+  groups: {
+    label: "Grup",
+    render() {
+      const c = S.config;
+      const out = [
+        h("div", { class: "card" },
+          row("Baca gambar di grup", "Poster, jadwal, dan struk dibaca AI biar ikut masuk rangkuman & pencarian. Gambarnya dikirim ke penyedia AI.",
+            toggle(c.readImages, (on) => save("/api/images", { enabled: on }))),
+        ),
+        h("h2", {}, "Pengaturan per grup"),
+      ];
+      if (!S.groups.length) {
+        out.push(h("div", { class: "card" }, h("div", { class: "stack muted" }, "Belum ada grup. Masukin nomor bot ke grup yang mau dipantau dulu.")));
+        return out;
+      }
+      out.push(h("div", { class: "card" }, h("table", {},
+        h("thead", {}, h("tr", {}, h("th", {}, "Grup"), h("th", {}, "Notif"), h("th", {}, "Baca gambar"))),
+        h("tbody", {}, S.groups.map((g) => h("tr", {},
+          h("td", { class: "name" }, g.name || "(tanpa nama)"),
+          h("td", {}, select([["all", "Semua"], ["mentions", "Cuma tag & reply"], ["off", "Mati"]], g.notify,
+            (v) => save("/api/group", { jid: g.jid, notify: v }))),
+          h("td", {}, select([["", `Ikut umum (${c.readImages ? "nyala" : "mati"})`], ["1", "Nyala"], ["0", "Mati"]], g.readImages == null ? "" : String(g.readImages),
+            (v) => save("/api/group", { jid: g.jid, readImages: v === "" ? null : v === "1" }))),
+        ))),
+      )));
+      out.push(h("p", { class: "small muted", style: "margin-top:10px" }, "Grup yang notifnya dimatiin tetap dicatat dan tetap masuk rangkuman."));
+      return out;
+    },
+  },
+
+  about: {
+    label: "Tentang",
+    render() {
+      const c = S.config;
+      return [
+        h("div", { class: "card" },
+          row("Versi Japri", "", h("span", {}, "v" + S.version)),
+          row("Nomor bot", "", h("span", { style: "user-select:text" }, S.bot ? "wa.me/" + S.bot : "Belum nyambung")),
+          row("Kabarin kalau ada versi baru", "Japri ngecek sekali sehari, terus ngabarin lo lewat WhatsApp.",
+            toggle(c.checkUpdates, (on) => saveSettings({ checkUpdates: on }))),
+        ),
+        h("h2", {}, "Setup ulang"),
+        h("div", { class: "card" },
+          row("Sambungin ulang dari awal", "Buka jendela setup lagi, mis. buat ganti nomor bot. Japri berhenti sebentar selama setup.",
+            h("button", { class: "btn", onclick: async () => {
+              if (!confirm("Buka setup dari awal?\nJapri bakal berhenti sebentar sampai setup selesai.")) return;
+              await api("/api/resetup", {}).catch((e) => toast(e.message, true));
+            } }, "Setup ulang…")),
+        ),
+      ];
+    },
+  },
+};
+
+/** Pilih model: kotak cari + daftar yang selalu kelihatan, plus kolom buat ngetik model yang gak ada di daftar. */
+function modelPicker() {
+  if (ai.models === null) return h("p", { class: "muted" }, h("span", { class: "spin" }), "Ngambil daftar model…");
+  const pick = (model, from) => {
+    ai.model = model; ai.error = "";
+    if (from !== "list") document.getElementById("modelSelect")?.querySelectorAll("option:checked").forEach((o) => (o.selected = false));
+    if (from !== "manual") { const m = document.getElementById("manualModel"); if (m) m.value = ""; }
+    updateAiButton();
+  };
+  const manual = (label) => h("div", { class: "field" }, h("span", {}, label),
+    h("input", { type: "text", class: "w-full", id: "manualModel", spellcheck: "false",
+      value: ai.models.includes(ai.model) ? "" : ai.model,
+      placeholder: ai.provider === "ollama" ? "cek pakai `ollama list`" : "",
+      oninput: (e) => pick(e.target.value.trim(), "manual") }));
+  if (!ai.models.length) return manual("Model");
+
+  const labels = ai.provider === "anthropic" ? Object.fromEntries(S.anthropicModels.map((m) => [m.id, m.label])) : {};
+  const list = h("select", { size: 8, class: "w-full", id: "modelSelect", onchange: (e) => pick(e.target.value, "list") });
+  const fill = (term) => {
+    const t = term.trim().toLowerCase();
+    const shown = ai.models.filter((m) => !t || m.toLowerCase().includes(t) || (labels[m] || "").toLowerCase().includes(t));
+    list.replaceChildren(...(shown.length ? shown.map((m) => h("option", { value: m, selected: m === ai.model }, labels[m] || m))
+      : [h("option", { disabled: true }, "Gak ada model yang cocok")]));
+  };
+  fill("");
+  // Model yang lagi dipakai langsung kelihatan di tengah daftar
+  requestAnimationFrame(() => {
+    const o = list.querySelector("option:checked");
+    if (o) list.scrollTop = o.offsetTop - list.clientHeight / 2;
+  });
+  return [
+    h("div", { class: "field" }, h("span", {}, `Model (${ai.models.length} tersedia)`),
+      h("input", { type: "text", class: "w-full", style: "margin-bottom:6px", spellcheck: "false",
+        placeholder: ai.provider === "openrouter" ? "Cari model, mis. haiku, atau :free buat model gratis" : "Cari model",
+        oninput: (e) => fill(e.target.value) }),
+      list),
+    manual("Atau ketik nama model lain"),
+  ];
+}
+
+async function saveAi(skipTest) {
+  ai.busy = true; ai.error = ""; render();
+  try {
+    S = await api("/api/ai", { provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model, skipTest });
+    ai.provider = null; ai.apiKey = "";
+    toast("Tersimpan. AI baru langsung dipakai.");
+  } catch (e) {
+    ai.error = e.message;
+  }
+  ai.busy = false;
+  render();
+}
+
+function loadModels() {
+  const key = JSON.stringify([ai.provider, ai.baseUrl, ai.apiKey]);
+  if (ai.modelsFor === key) return;
+  ai.modelsFor = key; ai.models = null; ai.modelsError = "";
+  api("/api/models", { provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey }).then(
+    (r) => { if (ai.modelsFor === key) { ai.models = r.models; ai.modelsError = r.error || ""; if (current === "ai") render(); } },
+    (e) => { if (ai.modelsFor === key) { ai.models = []; ai.modelsError = e.message; if (current === "ai") render(); } },
+  );
+}
+
+function updateAiButton() {
+  // Ketik model gak render ulang (biar kursor gak lompat); cukup update tombolnya
+  const b = document.getElementById("aiSave");
+  const cur = S.config.llm;
+  const p = S.providers.find((x) => x.id === ai.provider);
+  const keepsKey = ai.provider === cur.provider && cur.hasKey;
+  const changed = ai.provider !== cur.provider || ai.model !== cur.model || ai.apiKey !== "" || (p.needsBaseUrl && ai.baseUrl !== (cur.baseUrl || ""));
+  if (b) b.disabled = ai.busy || !changed || !ai.model || (p.needsKey && !keepsKey && ai.apiKey.length <= 10);
+}
+
+// ---------- Navigasi ----------
+let current = "ai";
+function render() {
+  const nav = document.getElementById("nav");
+  nav.querySelectorAll("button").forEach((b) => b.remove());
+  for (const [id, pg] of Object.entries(pages)) {
+    nav.append(h("button", { "aria-current": id === current ? "true" : "false", onclick: () => { current = id; render(); content.scrollTop = 0; } }, pg.label));
+  }
+  const pg = pages[current];
+  const scroll = content.scrollTop;
+  content.replaceChildren(h("h1", {}, pg.label), ...[pg.render()].flat().filter(Boolean));
+  content.scrollTop = scroll;
+}
+
+(async () => {
+  try {
+    S = await api("/api/state");
+  } catch (e) {
+    content.replaceChildren(h("div", { class: "error" }, "Gagal memuat pengaturan: " + e.message));
+    return;
+  }
+  render();
+})();
+</script>
+</body>
+</html>
