@@ -5,6 +5,11 @@ dan ringkasannya dikirim ke owner lewat WhatsApp waktu ada update.
 
 Format tiap versi: `## [x.y.z] - YYYY-MM-DD`, terus daftar poin (`- ...`) pakai bahasa yang dimengerti user awam.
 
+## [0.4.1] - 2026-10-28
+
+- Cek update gak gagal lagi waktu GitHub ngebatesin (error 403). Japri sekarang ngecek versi terbaru lewat japri.rifaldirizqi.web.id, dan kalau itu juga gagal, lewat halaman rilis GitHub. File installer-nya tetap diunduh dari GitHub
+- Tiap rilis cukup satu file installer: JapriSetup-x.y.z.exe
+
 ## [0.4.0] - 2026-10-28
 
 - Jawab anggota grup (opsional): _"jawab semua orang di grup kantor"_, terus anggota grup bisa nanya apa aja ke Japri dengan nge-tag, bales pesan Japri, atau awali dengan /ai. Pakai AI terpisah yang gak bisa baca catatan grup, dan penyedia/API key-nya bisa beda dari punya lo. Default mati, tanpa batas, bisa dikasih jatah per orang atau per grup
