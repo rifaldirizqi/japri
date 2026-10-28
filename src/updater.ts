@@ -1,9 +1,10 @@
-// Cek rilis baru di GitHub Releases dan kabarin owner. Cuma baca halaman rilis publik, gak ngirim data apa pun.
+// Cek rilis baru dan kabarin owner. Cuma baca info rilis publik, gak ngirim data apa pun.
+// Urutan: latest.json di homepage → GitHub API → halaman web GitHub. Installer-nya sendiri selalu di GitHub Releases.
 import fs from "node:fs";
 import { loadConfig, updateConfig } from "./config.js";
 import { isDesktop } from "./desktop.js";
 
-type Pkg = { version: string; repository?: { url?: string } | string };
+type Pkg = { version: string; repository?: { url?: string } | string; homepage?: string };
 const pkg = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")) as Pkg;
 
 export const currentVersion = pkg.version;
@@ -54,16 +55,52 @@ type GitHubRelease = {
   assets: { name: string; browser_download_url: string; size?: number; digest?: string | null }[];
 };
 
-/** Rilis dengan versi tertinggi (pre-release ikut dihitung, draft enggak). */
+/** Rilis terbaru. Pre-release cuma kebaca lewat GitHub API (latest.json & halaman web cuma rilis final). */
 export async function fetchLatestRelease(): Promise<Release | null> {
   const slug = repoSlug();
   if (!slug) return null;
+  try {
+    const r = await fetchFromHomepage(slug);
+    if (r) return r;
+  } catch {
+    // homepage lagi mati / belum ada latest.json → GitHub
+  }
+  return fetchFromApi(slug);
+}
+
+type LatestJson = { repo?: string; version?: string; url?: string; notes?: string; installer?: { url?: string; size?: number; sha256?: string } | null };
+
+/**
+ * latest.json di homepage (dibikin workflow landing dari GitHub Release): gak kena jatah API GitHub per IP.
+ * Dipakai cuma kalau isinya buat repo ini, jadi fork yang lupa ganti homepage tetap ngecek repo-nya sendiri.
+ */
+async function fetchFromHomepage(slug: string): Promise<Release | null> {
+  if (!pkg.homepage) return null;
+  const res = await fetch(new URL("latest.json", pkg.homepage.replace(/\/?$/, "/")), {
+    headers: { "User-Agent": `japri/${currentVersion}` },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return null;
+  const j = (await res.json()) as LatestJson;
+  if (j.repo?.toLowerCase() !== slug.toLowerCase() || !j.version || !parseVersion(j.version) || !j.url) return null;
+  // Installer wajib dari GitHub Releases repo ini: server homepage cuma ngasih tau versi, gak bisa nyodorin file lain
+  const { url = "", size, sha256 = "" } = j.installer ?? {};
+  const installer =
+    url.startsWith(`https://github.com/${slug}/releases/download/`) && typeof size === "number"
+      ? { url, size, sha256: /^[0-9a-f]{64}$/i.test(sha256) ? sha256.toLowerCase() : null }
+      : null;
+  return { version: j.version.replace(/^v/, ""), url: j.url, notes: j.notes ?? "", installerUrl: installer?.url ?? null, installer };
+}
+
+async function fetchFromApi(slug: string): Promise<Release | null> {
   const res = await fetch(`https://api.github.com/repos/${slug}/releases?per_page=20`, {
     headers: { Accept: "application/vnd.github+json", "User-Agent": `japri/${currentVersion}` },
     signal: AbortSignal.timeout(15_000),
   });
+  // API tanpa login dijatah 60x/jam per IP, dan IP-nya sering dipakai bareng (CGNAT). Kalau kena, lewat halaman web aja.
+  if (res.status === 403 || res.status === 429) return fetchLatestFromWeb(slug);
   if (!res.ok) throw new Error(`GitHub ngebales ${res.status}`);
-  const releases = ((await res.json()) as GitHubRelease[]).filter((r) => !r.draft && parseVersion(r.tag_name));
+  const releases =((await res.json()) as GitHubRelease[]).filter((r) => !r.draft && parseVersion(r.tag_name));
   if (releases.length === 0) return null;
   const latest = releases.reduce((a, b) => (compareVersions(b.tag_name, a.tag_name) > 0 ? b : a));
   const asset = latest.assets.find((a) => /^JapriSetup-.*\.exe$/i.test(a.name));
@@ -76,6 +113,31 @@ export async function fetchLatestRelease(): Promise<Release | null> {
       ? { url: asset.browser_download_url, size: asset.size ?? 0, sha256: asset.digest?.match(/^sha256:([0-9a-f]{64})$/i)?.[1].toLowerCase() ?? null }
       : null,
   };
+}
+
+/**
+ * Cadangan tanpa API: rilis terbaru dari redirect /releases/latest, catatan dari CHANGELOG.md di tag itu.
+ * Pre-release gak kebaca, dan checksum installer gak ada (jadi update sekali klik diganti download manual).
+ */
+async function fetchLatestFromWeb(slug: string): Promise<Release | null> {
+  const headers = { "User-Agent": `japri/${currentVersion}` };
+  const res = await fetch(`https://github.com/${slug}/releases/latest`, { headers, redirect: "manual", signal: AbortSignal.timeout(15_000) });
+  if (res.status === 404) return null; // belum ada rilis
+  const url = res.headers.get("location") ?? "";
+  const tag = url.match(/\/releases\/tag\/([^/?#]+)$/)?.[1];
+  if (!tag || !parseVersion(tag)) throw new Error(`GitHub lagi ngebatesin cek update (${res.status}). Coba lagi sejam lagi`);
+  const version = tag.replace(/^v/, "");
+  let notes = "";
+  try {
+    const cl = await fetch(`https://raw.githubusercontent.com/${slug}/${tag}/CHANGELOG.md`, { headers, signal: AbortSignal.timeout(15_000) });
+    if (cl.ok) {
+      const section = (await cl.text()).split(/^## \[/m).find((s) => s.startsWith(`${version}]`));
+      notes = section?.split("\n").slice(1).join("\n").trim() ?? "";
+    }
+  } catch {
+    // catatan rilis cuma pelengkap
+  }
+  return { version, url, notes, installerUrl: `https://github.com/${slug}/releases/download/${tag}/JapriSetup-${version}.exe`, installer: null };
 }
 
 // ---------- Pesan ----------

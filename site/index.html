@@ -278,7 +278,7 @@
         <h1>Asisten pribadi buat <em>grup WhatsApp</em> lo</h1>
         <p class="lead">Japri nongkrong di grup-grup lo, terus <b>japri lo</b> kalau ada yang nyariin, bikinin rangkuman obrolan, dan ngingetin hal penting. Gak perlu lagi scroll ratusan chat.</p>
         <div class="cta">
-          <a class="btn btn-primary" href="https://github.com/rifaldirizqi/japri/releases/latest/download/JapriSetup.exe">
+          <a class="btn btn-primary" data-download href="https://github.com/rifaldirizqi/japri/releases/latest">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
             Download buat Windows
           </a>
@@ -513,7 +513,7 @@
         <h2>Biar Japri yang baca grupnya</h2>
         <p>Lo cukup baca yang penting aja.</p>
         <div class="cta">
-          <a class="btn btn-primary" href="https://github.com/rifaldirizqi/japri/releases/latest/download/JapriSetup.exe">
+          <a class="btn btn-primary" data-download href="https://github.com/rifaldirizqi/japri/releases/latest">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
             Download buat Windows
           </a>
@@ -549,14 +549,20 @@
     });
   })();
 
-  // Tampilin versi terbaru dari GitHub (kalau gagal, gak apa-apa: tombol download tetap jalan)
-  fetch("https://api.github.com/repos/rifaldirizqi/japri/releases/latest")
+  // Versi terbaru & link installer dari latest.json (dibikin waktu deploy dari GitHub Release).
+  // Kalau gagal, gak apa-apa: tombol download tetap ngarah ke halaman rilis terbaru di GitHub.
+  fetch("latest.json", { cache: "no-cache" })
     .then((r) => (r.ok ? r.json() : null))
     .then((rel) => {
-      if (!rel || !rel.tag_name) return;
+      if (!rel || !rel.version) return;
+      if (rel.installer && rel.installer.url) {
+        document.querySelectorAll("a[data-download]").forEach((a) => (a.href = rel.installer.url));
+      }
       const el = document.getElementById("version");
-      const date = new Date(rel.published_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-      el.textContent = `Versi terbaru ${rel.tag_name} · rilis ${date}`;
+      const date = rel.published
+        ? " · rilis " + new Date(rel.published).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+        : "";
+      el.textContent = `Versi terbaru v${rel.version}${date}`;
       el.hidden = false;
     })
     .catch(() => {});

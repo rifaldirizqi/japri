@@ -18,3 +18,6 @@ id_ed25519*
 *.dump
 *.sql.gz
 backups/
+
+# Dibikin workflow landing waktu deploy
+site/latest.json

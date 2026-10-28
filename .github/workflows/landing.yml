@@ -40,6 +40,26 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
+      - name: Bikin latest.json dari rilis terbaru
+        # Dibaca Japri buat cek update (gak kena jatah API GitHub per IP) & tombol download. Installer-nya tetap di GitHub.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          if ! gh api "repos/$REPO/releases/latest" > "$RUNNER_TEMP/release.json"; then
+            echo "Belum ada rilis, latest.json gak dibikin"; exit 0
+          fi
+          jq '{
+            repo: env.REPO,
+            version: (.tag_name | ltrimstr("v")),
+            url: .html_url,
+            published: .published_at,
+            notes: (.body // ""),
+            installer: (first(.assets[] | select(.name | test("^JapriSetup-.*\\.exe$"))
+              | {url: .browser_download_url, size: .size, sha256: ((.digest // "") | ltrimstr("sha256:"))}) // null)
+          }' "$RUNNER_TEMP/release.json" > site/latest.json
+          cat site/latest.json
+
       - name: Upload ke VPS
         # Key di VPS dibatasi rrsync ke /var/www/japri, jadi tujuan ":" = folder itu
         run: |

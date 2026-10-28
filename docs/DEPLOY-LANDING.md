@@ -1,6 +1,6 @@
 # Deploy landing page ke VPS
 
-Landing page Japri (folder `site/`) di-deploy otomatis ke VPS tiap ada perubahan di `site/` yang di-push ke `main`.
+Landing page Japri (folder `site/`) di-deploy otomatis ke VPS tiap ada perubahan di `site/` yang di-push ke `main`. Tiap rilis baru, workflow installer Windows juga memicu deploy ini supaya `latest.json` (versi terbaru, link & checksum installer di GitHub Releases) ikut ke-update. File itu dibaca Japri buat cek update dan tombol download di landing page.
 Caranya: GitHub Actions upload file pakai `rsync` lewat SSH, terus Caddy nyajiin halamannya dengan HTTPS otomatis.
 
 Setup ini cukup sekali. Butuh: VPS Ubuntu/Debian dengan Caddy terpasang langsung di host (bukan di container), plus akses `sudo`. Caddy pegang port 80 & 443, dan landing page dapet blok situs sendiri di `/etc/caddy/Caddyfile`.

@@ -69,6 +69,59 @@ describe("checkForUpdate", () => {
     assert.equal(s.kind, "error");
   });
 
+  test("API kena jatah (403) → cek lewat halaman rilis & CHANGELOG", async () => {
+    const original = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = (async (url: string | URL) => {
+      const u = String(url);
+      urls.push(u);
+      if (u.includes("api.github.com")) return new Response("rate limited", { status: 403 });
+      if (u.endsWith("/releases/latest"))
+        return new Response(null, { status: 302, headers: { location: "https://github.com/rifaldirizqi/japri/releases/tag/v8.1.0" } });
+      return new Response("# Changelog\n\n## [8.1.0] - 2026-01-01\n\n- Fitur baru\n\n## [8.0.0] - 2025-12-01\n\n- Lama\n");
+    }) as typeof fetch;
+    const s = await updater.checkForUpdate();
+    globalThis.fetch = original;
+    assert.equal(s.kind, "available");
+    if (s.kind !== "available") return;
+    assert.equal(s.release.version, "8.1.0");
+    assert.equal(updater.summarizeNotes(s.release.notes), "• Fitur baru");
+    assert.equal(s.release.installerUrl, "https://github.com/rifaldirizqi/japri/releases/download/v8.1.0/JapriSetup-8.1.0.exe");
+    assert.equal(s.release.installer, null); // tanpa checksum = gak dipasang otomatis
+    assert.ok(urls.some((u) => /raw\.githubusercontent\.com\/rifaldirizqi\/japri\/v8\.1\.0\/CHANGELOG\.md/.test(u)));
+  });
+
+  test("latest.json di homepage dipakai duluan, installer wajib dari GitHub repo ini", async () => {
+    const original = globalThis.fetch;
+    const sha = "a".repeat(64);
+    let latest: unknown = {};
+    const urls: string[] = [];
+    globalThis.fetch = (async (url: string | URL) => {
+      const u = String(url);
+      urls.push(u);
+      if (u === "https://japri.rifaldirizqi.web.id/latest.json") return new Response(JSON.stringify(latest));
+      return new Response(JSON.stringify([release("v1.0.0")]));
+    }) as typeof fetch;
+    const dl = "https://github.com/rifaldirizqi/japri/releases/download/v9.0.0/JapriSetup-9.0.0.exe";
+    latest = { repo: "rifaldirizqi/japri", version: "9.0.0", url: "https://github.com/rifaldirizqi/japri/releases/tag/v9.0.0", notes: "- Baru", installer: { url: dl, size: 10, sha256: sha } };
+    let s = await updater.checkForUpdate();
+    assert.equal(urls.length, 1); // gak nyentuh GitHub API
+    assert.deepEqual(s.kind === "available" && s.release.installer, { url: dl, size: 10, sha256: sha });
+
+    // Installer dari tempat lain → diabaikan (gak bisa update otomatis)
+    latest = { ...(latest as object), installer: { url: "https://evil.example.com/JapriSetup-9.0.0.exe", size: 10, sha256: sha } };
+    s = await updater.checkForUpdate();
+    assert.equal(s.kind === "available" && s.release.installer, null);
+
+    // latest.json buat repo lain (fork lupa ganti homepage) → cek GitHub repo sendiri
+    latest = { ...(latest as object), repo: "orang/lain" };
+    urls.length = 0;
+    s = await updater.checkForUpdate();
+    globalThis.fetch = original;
+    assert.equal(s.kind === "available" && s.release.version, "1.0.0");
+    assert.match(urls[1], /api\.github\.com/);
+  });
+
   test("owner dikabarin sekali per versi", async () => {
     releases = [release("v5.0.0")];
     const sent: string[] = [];

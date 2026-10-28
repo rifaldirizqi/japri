@@ -43,7 +43,7 @@ AI anggota gak pakai tool, jadi model murah, gratis (OpenRouter `:free`), atau l
 
 ### Cara A — Windows, tinggal klik (paling gampang)
 
-1. Download **[JapriSetup.exe](https://github.com/rifaldirizqi/japri/releases/latest/download/JapriSetup.exe)** (atau dari [japri.rifaldirizqi.web.id](https://japri.rifaldirizqi.web.id)).
+1. Download **JapriSetup-x.y.z.exe** dari [rilis terbaru](https://github.com/rifaldirizqi/japri/releases/latest) (atau dari [japri.rifaldirizqi.web.id](https://japri.rifaldirizqi.web.id)).
 2. Dobel-klik file itu. Kalau muncul layar biru _"Windows protected your PC"_, klik **More info** → **Run anyway**. Ini muncul karena installer-nya belum punya sertifikat tanda tangan digital, bukan karena virus.
 3. Klik **Next** sampai **Finish**. Gak perlu hak admin, dan gak perlu install apa-apa lagi.
 4. Jendela setup Japri kebuka otomatis. Ikutin langkahnya:
